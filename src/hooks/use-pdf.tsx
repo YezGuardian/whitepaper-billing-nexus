@@ -1,6 +1,6 @@
 
 import { useRef, useState } from 'react';
-import { generatePdf } from 'react-to-pdf';
+import ReactToPdf from 'react-to-pdf';
 
 export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string } = {}) {
   const targetRef = useRef<HTMLDivElement>(null);
@@ -11,9 +11,10 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
     
     try {
       setLoading(true);
-      await generatePdf({
-        element: targetRef.current,
+      // Using the default export from react-to-pdf
+      await ReactToPdf({
         filename,
+        element: targetRef.current,
         options: {
           page: {
             margin: 20,
