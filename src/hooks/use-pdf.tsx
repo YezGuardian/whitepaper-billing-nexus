@@ -13,9 +13,9 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
       setLoading(true);
       // Using the default export from react-to-pdf
       await ReactToPdf({
-        filename,
         element: targetRef.current,
         options: {
+          filename: filename,
           page: {
             margin: 20,
             format: 'a4',
