@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { useReactToPdf } from 'react-to-pdf';
+import { useReactToPdf } from '@/hooks/use-pdf';
 import MainLayout from '@/layouts/MainLayout';
 import { DataTable } from '@/components/DataTable';
 import { Button } from '@/components/ui/button';

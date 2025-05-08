@@ -92,10 +92,19 @@ const SettingsForm = ({ settings, onSave }: SettingsFormProps) => {
   function onSubmitCompany(data: z.infer<typeof companyFormSchema>) {
     setIsSubmitting(true);
     
+    // Ensure bank details are not optional
+    const bankDetails = {
+      bankName: data.bankDetails.bankName || "",
+      accountNumber: data.bankDetails.accountNumber || "",
+      branchCode: data.bankDetails.branchCode || "",
+      accountType: data.bankDetails.accountType || "",
+    };
+    
     // Combine with existing settings
     const updatedSettings = {
       ...settings,
       ...data,
+      bankDetails,
     };
     
     // Simulate API call

@@ -4,12 +4,19 @@ import { BarChart, Activity, Users, FileText, FileClock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import MainLayout from "@/layouts/MainLayout";
 import {
-  Chart,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  ChartBar,
 } from "@/components/ui/chart";
+import {
+  BarChart as ReBarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from 'recharts';
 import StatCard from "@/components/StatCard";
 import { clients, invoices, quotes } from "@/data/mockData";
 
@@ -106,23 +113,23 @@ const DashboardPage = () => {
           </CardHeader>
           <CardContent>
             <div className="h-72">
-              <ChartContainer
-                data={revenueData}
-                xField="name"
-                categoryField="name"
-                startEndOnly={false}
-              >
-                <Chart>
-                  <ChartBar
-                    name="Monthly Revenue"
-                    field="revenue"
-                    color="#1037D0"
-                  />
-                </Chart>
-                <ChartTooltip>
-                  <ChartTooltipContent className="bg-background text-foreground" />
-                </ChartTooltip>
-              </ChartContainer>
+              <ResponsiveContainer width="100%" height="100%">
+                <ReBarChart
+                  data={revenueData}
+                  margin={{
+                    top: 5,
+                    right: 30,
+                    left: 20,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="revenue" fill="#1037D0" />
+                </ReBarChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>

@@ -147,8 +147,11 @@ const QuoteForm: React.FC<QuoteFormProps> = ({
       const taxAmount = (itemTotal * item.taxRate) / 100;
       
       return {
-        ...item,
         id: item.id || uuidv4(),
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        taxRate: item.taxRate,
         taxAmount,
         total: itemTotal + taxAmount,
       };
