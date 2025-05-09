@@ -1,27 +1,23 @@
 
 import { useRef, useState } from 'react';
-import ReactToPdf from 'react-to-pdf';
+import { usePDF } from 'react-to-pdf';
 
 export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string } = {}) {
   const targetRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Use the proper hook from react-to-pdf
+  const { toPDF } = usePDF({
+    filename,
+    targetRef,
+  });
 
-  const toPDF = async () => {
+  const generatePdf = async () => {
     if (!targetRef.current) return;
     
     try {
       setLoading(true);
-      // Using the default export from react-to-pdf
-      await ReactToPdf({
-        element: targetRef.current,
-        options: {
-          filename: filename,
-          page: {
-            margin: 20,
-            format: 'a4',
-          },
-        },
-      });
+      await toPDF();
     } catch (error) {
       console.error('Failed to generate PDF:', error);
     } finally {
@@ -29,5 +25,5 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
     }
   };
 
-  return { toPDF, targetRef, loading };
+  return { toPDF: generatePdf, targetRef, loading };
 }
