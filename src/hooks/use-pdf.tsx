@@ -17,9 +17,9 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
     
     try {
       setLoading(true);
-      // The toPDF function accepts options as a parameter, not the HTML element directly
-      // We need to pass an object with a 'targetElement' property
-      await toPDF({ targetElement: targetRef.current });
+      // According to react-to-pdf v2 API, toPDF() should be called directly
+      // without any parameters, as the targetRef is already set in the usePDF hook
+      await toPDF();
     } catch (error) {
       console.error('Failed to generate PDF:', error);
     } finally {

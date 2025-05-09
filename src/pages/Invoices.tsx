@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -22,7 +21,7 @@ const InvoicesPage = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  // PDF generation setup
+  // PDF generation setup - ensure targetRef is passed to InvoiceDocument
   const { toPDF, targetRef } = useReactToPdf({
     filename: selectedInvoice ? `invoice-${selectedInvoice.invoiceNumber}.pdf` : 'invoice.pdf',
   });
@@ -72,11 +71,9 @@ const InvoicesPage = () => {
     setIsViewOpen(true);
   };
 
-  // Handle download PDF
+  // Handle download PDF - correctly calling the toPDF function from our hook
   const handleDownload = () => {
-    if (targetRef.current) {
-      toPDF();
-    }
+    toPDF();
   };
 
   // Create a new invoice
