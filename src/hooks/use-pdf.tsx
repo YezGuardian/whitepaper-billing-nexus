@@ -9,8 +9,7 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
   // Use the proper hook from react-to-pdf with correct options
   const { toPDF } = usePDF({
     filename,
-    // According to the react-to-pdf documentation, we need to use 'element' to specify the target element
-    element: targetRef.current,
+    // The correct approach is to use the options format required by react-to-pdf v2
   });
 
   const generatePdf = async () => {
@@ -18,7 +17,8 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
     
     try {
       setLoading(true);
-      await toPDF();
+      // Pass the target ref to toPDF when it's called
+      await toPDF(targetRef.current);
     } catch (error) {
       console.error('Failed to generate PDF:', error);
     } finally {
