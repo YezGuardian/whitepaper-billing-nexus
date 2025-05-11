@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -22,8 +21,8 @@ const QuotesPage = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  // PDF generation setup
-  const { toPDF, targetRef } = useReactToPdf({
+  // PDF generation setup with our enhanced hook
+  const { toPDF, targetRef, loading } = useReactToPdf({
     filename: selectedQuote ? `quote-${selectedQuote.quoteNumber}.pdf` : 'quote.pdf',
   });
 
@@ -72,10 +71,20 @@ const QuotesPage = () => {
     setIsViewOpen(true);
   };
 
-  // Handle download PDF
-  const handleDownload = () => {
-    if (targetRef.current) {
-      toPDF();
+  // Handle download PDF with our enhanced function
+  const handleDownload = async () => {
+    const url = await toPDF();
+    if (url) {
+      toast({
+        title: 'PDF Generated',
+        description: 'PDF has been generated and downloaded successfully.',
+      });
+    } else {
+      toast({
+        title: 'PDF Generation Failed',
+        description: 'Failed to generate PDF. Please try again.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -205,9 +214,10 @@ const QuotesPage = () => {
               size="sm"
               onClick={handleDownload}
               className="flex items-center"
+              disabled={loading}
             >
               <Download className="mr-2 h-4 w-4" />
-              Download PDF
+              {loading ? 'Generating...' : 'Download PDF'}
             </Button>
           </DialogHeader>
           <div ref={targetRef}>

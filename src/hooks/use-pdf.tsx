@@ -1,17 +1,18 @@
 
 import { useRef, useState } from 'react';
 import { usePDF } from 'react-to-pdf';
+import { supabase } from '@/integrations/supabase/client';
 
 export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string } = {}) {
   const targetRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   
-  // In react-to-pdf v2, targetRef is passed directly to the hook, not inside options
+  // In react-to-pdf v2, targetRef is passed directly to the hook
   const { toPDF } = usePDF({
     filename,
     targetRef,
     options: {
-      // Only pass valid format options inside the options object
       format: [210, 297], // A4 dimensions in mm
       orientation: 'portrait',
       margin: {
@@ -27,14 +28,53 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
   const generatePdf = async () => {
     try {
       setLoading(true);
-      // The toPDF function from react-to-pdf v2 expects 0 arguments
-      await toPDF();
+      
+      // Generate the PDF blob
+      const blob = await toPDF();
+      
+      if (!blob) {
+        throw new Error('Failed to generate PDF');
+      }
+      
+      // Generate unique filename with timestamp
+      const timestamp = new Date().getTime();
+      const uniqueFilename = `${filename.replace('.pdf', '')}_${timestamp}.pdf`;
+      
+      // Upload to Supabase storage
+      const { data, error } = await supabase.storage
+        .from('pdfs')
+        .upload(uniqueFilename, blob, {
+          contentType: 'application/pdf',
+          cacheControl: '3600'
+        });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Get public URL for the uploaded file
+      const { data: urlData } = supabase.storage
+        .from('pdfs')
+        .getPublicUrl(uniqueFilename);
+      
+      setDownloadUrl(urlData.publicUrl);
+      
+      // Auto-download the file
+      const link = document.createElement('a');
+      link.href = urlData.publicUrl;
+      link.download = uniqueFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      return urlData.publicUrl;
     } catch (error) {
       console.error('Failed to generate PDF:', error);
+      return null;
     } finally {
       setLoading(false);
     }
   };
 
-  return { toPDF: generatePdf, targetRef, loading };
+  return { toPDF: generatePdf, targetRef, loading, downloadUrl };
 }

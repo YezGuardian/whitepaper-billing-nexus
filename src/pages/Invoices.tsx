@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -22,7 +23,7 @@ const InvoicesPage = () => {
   const { toast } = useToast();
 
   // PDF generation setup - ensure targetRef is passed to InvoiceDocument
-  const { toPDF, targetRef } = useReactToPdf({
+  const { toPDF, targetRef, loading, downloadUrl } = useReactToPdf({
     filename: selectedInvoice ? `invoice-${selectedInvoice.invoiceNumber}.pdf` : 'invoice.pdf',
   });
 
@@ -72,8 +73,20 @@ const InvoicesPage = () => {
   };
 
   // Handle download PDF - correctly calling the toPDF function from our hook
-  const handleDownload = () => {
-    toPDF();
+  const handleDownload = async () => {
+    const url = await toPDF();
+    if (url) {
+      toast({
+        title: 'PDF Generated',
+        description: 'PDF has been generated and downloaded successfully.',
+      });
+    } else {
+      toast({
+        title: 'PDF Generation Failed',
+        description: 'Failed to generate PDF. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Create a new invoice
@@ -209,9 +222,10 @@ const InvoicesPage = () => {
               size="sm"
               onClick={handleDownload}
               className="flex items-center"
+              disabled={loading}
             >
               <Download className="mr-2 h-4 w-4" />
-              Download PDF
+              {loading ? 'Generating...' : 'Download PDF'}
             </Button>
           </DialogHeader>
           <div ref={targetRef}>
