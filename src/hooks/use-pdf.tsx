@@ -8,8 +8,7 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
   const [loading, setLoading] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   
-  // In react-to-pdf v2, we use the hook's provided toPDF method
-  // without configuration in the hook initialization
+  // In react-to-pdf v2, we use the hook without configuration
   const { toPDF } = usePDF();
 
   const generatePdf = async () => {
@@ -20,8 +19,10 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
         throw new Error('Target ref is not available');
       }
       
-      // Generate the PDF blob by passing the element and options to toPDF
-      const blob = await toPDF(targetRef.current, {
+      // FIX 1: Pass options as a single argument object instead of as a second parameter
+      // The toPDF function expects a single options object that includes both the element and config
+      const blob = await toPDF({
+        element: targetRef.current,
         filename,
         format: [210, 297], // A4 dimensions in mm
         orientation: 'portrait',
@@ -34,6 +35,8 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
         hotfix: { px_to_mm: 0.36 }
       });
       
+      // FIX 2: Since toPDF may return undefined or void, we need to ensure we have a blob
+      // before proceeding with the upload
       if (!blob) {
         throw new Error('Failed to generate PDF');
       }
