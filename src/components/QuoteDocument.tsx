@@ -1,4 +1,3 @@
-
 import { format } from 'date-fns';
 import { Quote } from '@/types';
 import Logo from './Logo';
@@ -13,7 +12,13 @@ const QuoteDocument: React.FC<QuoteDocumentProps> = ({ quote }) => {
     <div className="pdf-content bg-white p-8 shadow-lg rounded-lg">
       <div className="flex justify-between items-start">
         <div>
-          <Logo className="h-16 w-auto" />
+          <div className="mb-4">
+            <img 
+              src="/lovable-uploads/a5faa576-4cfa-4071-863c-5cfac82a795f.png" 
+              alt="White Paper Systems Logo" 
+              className="h-16 w-auto" 
+            />
+          </div>
           <div className="mt-4">
             <div className="font-bold">{companySettings.name}</div>
             <div className="text-sm text-gray-500 whitespace-pre-line">{companySettings.address}</div>

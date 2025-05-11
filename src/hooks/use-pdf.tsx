@@ -9,17 +9,27 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
   // Use the proper hook from react-to-pdf with correct options
   const { toPDF } = usePDF({
     filename,
-    // The correct approach is to use the options format required by react-to-pdf v2
+    targetRef,
+    options: {
+      // Ensure proper PDF generation with good quality
+      format: 'a4',
+      orientation: 'portrait',
+      margin: {
+        top: '20mm',
+        right: '20mm',
+        bottom: '20mm',
+        left: '20mm',
+      },
+      hotfix: { px_to_mm: 0.36 }
+    }
   });
 
   const generatePdf = async () => {
-    if (!targetRef.current) return;
-    
     try {
       setLoading(true);
-      // According to react-to-pdf v2 API, toPDF() should be called directly
-      // without any parameters, as the targetRef is already set in the usePDF hook
+      // Call toPDF without arguments since targetRef is already set in usePDF options
       await toPDF();
+      console.log('PDF generation successful');
     } catch (error) {
       console.error('Failed to generate PDF:', error);
     } finally {

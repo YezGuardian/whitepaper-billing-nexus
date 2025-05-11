@@ -1,19 +1,36 @@
+
 import React from 'react';
+
 interface LogoProps {
   className?: string;
   variant?: 'default' | 'full' | 'icon-only';
 }
+
 const Logo: React.FC<LogoProps> = ({
   className = "",
   variant = 'default'
 }) => {
   if (variant === 'icon-only') {
-    return <div className={`flex items-center ${className}`}>
-        <img alt="White Paper Systems Logo" className="h-8 w-auto" src="/lovable-uploads/47416886-56af-4126-88c7-2c281fca7be6.png" />
-      </div>;
+    return (
+      <div className={`flex items-center ${className}`}>
+        <img 
+          src="/lovable-uploads/f08ede10-a902-42ac-ad8b-9ec80ae081c2.png" 
+          alt="White Paper Systems Logo" 
+          className="h-8 w-auto" 
+        />
+      </div>
+    );
   }
-  return <div className={`flex items-center ${className}`}>
-      <img src="/lovable-uploads/450f2cc0-d3de-4b08-a6cd-f53502a3610d.png" alt="White Paper Systems Logo" className="h-8 sm:h-10 w-auto" />
-    </div>;
+  
+  return (
+    <div className={`flex items-center ${className}`}>
+      <img 
+        src="/lovable-uploads/a5faa576-4cfa-4071-863c-5cfac82a795f.png" 
+        alt="White Paper Systems Logo" 
+        className="h-8 sm:h-10 w-auto" 
+      />
+    </div>
+  );
 };
+
 export default Logo;
