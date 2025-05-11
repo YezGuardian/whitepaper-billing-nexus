@@ -8,21 +8,9 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
   const [loading, setLoading] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   
-  // In react-to-pdf v2, we pass options directly without targetRef
-  const { toPDF } = usePDF({
-    filename,
-    options: {
-      format: [210, 297], // A4 dimensions in mm
-      orientation: 'portrait',
-      margin: {
-        top: '20mm',
-        right: '20mm',
-        bottom: '20mm',
-        left: '20mm',
-      },
-      hotfix: { px_to_mm: 0.36 }
-    }
-  });
+  // In react-to-pdf v2, we use the hook's provided toPDF method
+  // without configuration in the hook initialization
+  const { toPDF } = usePDF();
 
   const generatePdf = async () => {
     try {
@@ -32,8 +20,19 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
         throw new Error('Target ref is not available');
       }
       
-      // Generate the PDF blob by passing targetRef directly to toPDF
-      const blob = await toPDF(targetRef);
+      // Generate the PDF blob by passing the element and options to toPDF
+      const blob = await toPDF(targetRef.current, {
+        filename,
+        format: [210, 297], // A4 dimensions in mm
+        orientation: 'portrait',
+        margin: {
+          top: '20mm',
+          right: '20mm',
+          bottom: '20mm',
+          left: '20mm',
+        },
+        hotfix: { px_to_mm: 0.36 }
+      });
       
       if (!blob) {
         throw new Error('Failed to generate PDF');
