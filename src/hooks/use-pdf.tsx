@@ -6,13 +6,13 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
   const targetRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   
-  // Use the proper hook from react-to-pdf with the correct options structure
+  // In react-to-pdf v2, targetRef is passed directly to the hook, not inside options
   const { toPDF } = usePDF({
     filename,
-    // Pass targetRef to the hook
     targetRef,
     options: {
-      format: 'a4',
+      // Only pass valid format options inside the options object
+      format: [210, 297], // A4 dimensions in mm
       orientation: 'portrait',
       margin: {
         top: '20mm',
@@ -27,8 +27,7 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
   const generatePdf = async () => {
     try {
       setLoading(true);
-      // The toPDF function from react-to-pdf v2 expects 0-1 arguments
-      // We pass the ref in the options when creating the hook, not here
+      // The toPDF function from react-to-pdf v2 expects 0 arguments
       await toPDF();
     } catch (error) {
       console.error('Failed to generate PDF:', error);
