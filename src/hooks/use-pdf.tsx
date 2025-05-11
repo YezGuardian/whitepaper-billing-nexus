@@ -6,18 +6,22 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
   const targetRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   
-  // Use the proper hook from react-to-pdf
+  // Use the proper hook from react-to-pdf with the correct options structure
   const { toPDF } = usePDF({
     filename,
-    format: 'a4',
-    orientation: 'portrait',
-    margin: {
-      top: '20mm',
-      right: '20mm',
-      bottom: '20mm',
-      left: '20mm',
-    },
-    hotfix: { px_to_mm: 0.36 }
+    // Pass targetRef to the hook
+    targetRef,
+    options: {
+      format: 'a4',
+      orientation: 'portrait',
+      margin: {
+        top: '20mm',
+        right: '20mm',
+        bottom: '20mm',
+        left: '20mm',
+      },
+      hotfix: { px_to_mm: 0.36 }
+    }
   });
 
   const generatePdf = async () => {
