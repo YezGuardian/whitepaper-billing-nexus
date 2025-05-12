@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useReactToPdf } from '@/hooks/use-pdf';
@@ -12,60 +11,53 @@ import StatusBadge from '@/components/StatusBadge';
 import { Edit, Eye, FileText, Download, Plus, Trash2 } from 'lucide-react';
 import InvoiceForm from '@/components/InvoiceForm';
 import InvoiceDocument from '@/components/InvoiceDocument';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getInvoices, getClients, deleteInvoice, getCompanySettings } from '@/services/supabaseService';
-import { Skeleton } from '@/components/ui/skeleton';
+import { companySettings, clients, invoices as mockInvoices } from '@/data/mockData';
 
 const InvoicesPage = () => {
+  const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  // Fetch data from Supabase
-  const { data: invoices, isLoading: invoicesLoading } = useQuery({
-    queryKey: ['invoices'],
-    queryFn: getInvoices
-  });
-
-  const { data: clients, isLoading: clientsLoading } = useQuery({
-    queryKey: ['clients'],
-    queryFn: getClients
-  });
-
-  const { data: companySettings, isLoading: settingsLoading } = useQuery({
-    queryKey: ['companySettings'],
-    queryFn: getCompanySettings
-  });
-
-  // Delete invoice mutation
-  const deleteMutation = useMutation({
-    mutationFn: deleteInvoice,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      toast({
-        title: 'Invoice deleted',
-        description: `Invoice has been deleted successfully.`,
-      });
-      setIsDeleteDialogOpen(false);
-      setSelectedInvoice(null);
-    },
-    onError: (error) => {
-      console.error('Error deleting invoice:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete the invoice. Please try again.',
-        variant: 'destructive',
-      });
-    }
-  });
-
-  // PDF generation setup
+  // PDF generation setup - ensure targetRef is passed to InvoiceDocument
   const { toPDF, targetRef, loading } = useReactToPdf({
     filename: selectedInvoice ? `invoice-${selectedInvoice.invoiceNumber}.pdf` : 'invoice.pdf',
   });
+
+  // Handle form submission
+  const handleSaveInvoice = (invoice: Invoice) => {
+    if (invoices.some(inv => inv.id === invoice.id)) {
+      // Update existing invoice
+      setInvoices(invoices.map(inv => (inv.id === invoice.id ? invoice : inv)));
+      toast({
+        title: 'Invoice updated',
+        description: `Invoice ${invoice.invoiceNumber} has been updated.`,
+      });
+    } else {
+      // Add new invoice
+      setInvoices([...invoices, invoice]);
+      toast({
+        title: 'Invoice created',
+        description: `Invoice ${invoice.invoiceNumber} has been created.`,
+      });
+    }
+    setIsFormOpen(false);
+  };
+
+  // Handle invoice deletion
+  const handleDeleteInvoice = () => {
+    if (!selectedInvoice) return;
+    
+    setInvoices(invoices.filter(inv => inv.id !== selectedInvoice.id));
+    toast({
+      title: 'Invoice deleted',
+      description: `Invoice ${selectedInvoice.invoiceNumber} has been deleted.`,
+    });
+    setIsDeleteDialogOpen(false);
+    setSelectedInvoice(null);
+  };
 
   // Open invoice form for editing
   const handleEdit = (invoice: Invoice) => {
@@ -79,7 +71,7 @@ const InvoicesPage = () => {
     setIsViewOpen(true);
   };
 
-  // Handle download PDF
+  // Handle download PDF using our updated approach
   const handleDownload = async () => {
     try {
       const url = await toPDF();
@@ -104,12 +96,6 @@ const InvoicesPage = () => {
   const handleCreate = () => {
     setSelectedInvoice(null);
     setIsFormOpen(true);
-  };
-
-  // Handle invoice deletion
-  const handleDeleteInvoice = () => {
-    if (!selectedInvoice) return;
-    deleteMutation.mutate(selectedInvoice.id);
   };
 
   // Table columns configuration
@@ -193,22 +179,6 @@ const InvoicesPage = () => {
     },
   ];
 
-  if (invoicesLoading || clientsLoading || settingsLoading) {
-    return (
-      <MainLayout>
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <div className="space-y-4">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full" />
-          ))}
-        </div>
-      </MainLayout>
-    );
-  }
-
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
@@ -219,11 +189,7 @@ const InvoicesPage = () => {
         </Button>
       </div>
 
-      <DataTable 
-        columns={columns} 
-        data={invoices || []} 
-        searchField="invoiceNumber" 
-      />
+      <DataTable columns={columns} data={invoices} searchField="invoiceNumber" />
 
       {/* Invoice Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
@@ -233,21 +199,16 @@ const InvoicesPage = () => {
               {selectedInvoice ? 'Edit Invoice' : 'Create Invoice'}
             </DialogTitle>
           </DialogHeader>
-          {companySettings && clients && (
-            <InvoiceForm
-              invoice={selectedInvoice || undefined}
-              clients={clients}
-              onSave={() => {
-                setIsFormOpen(false);
-                queryClient.invalidateQueries({ queryKey: ['invoices'] });
-              }}
-              onCancel={() => setIsFormOpen(false)}
-              companySettings={{
-                invoicePrefix: companySettings.invoicePrefix,
-                invoiceTerms: companySettings.invoiceTerms,
-              }}
-            />
-          )}
+          <InvoiceForm
+            invoice={selectedInvoice || undefined}
+            clients={clients}
+            onSave={handleSaveInvoice}
+            onCancel={() => setIsFormOpen(false)}
+            companySettings={{
+              invoicePrefix: companySettings.invoicePrefix,
+              invoiceTerms: companySettings.invoiceTerms,
+            }}
+          />
         </DialogContent>
       </Dialog>
 
@@ -289,12 +250,8 @@ const InvoicesPage = () => {
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
               Cancel
             </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleDeleteInvoice}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            <Button variant="destructive" onClick={handleDeleteInvoice}>
+              Delete
             </Button>
           </div>
         </DialogContent>

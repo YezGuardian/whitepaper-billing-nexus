@@ -33,9 +33,8 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgData = canvas.toDataURL('image/png');
       
-      // Add image to PDF with proper margins for A4 - fixing type errors
-      const margin = 0; // Set margin to 0 for full page
-      pdf.addImage(imgData, 'PNG', margin, margin, imgWidth - (margin * 2), imgHeight - (margin * 2));
+      // Add image to PDF
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
       
       // Generate blob
       const blob = pdf.output('blob');
@@ -61,27 +60,24 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
         .from('pdfs')
         .getPublicUrl(uniqueFilename);
       
-      if (urlData) {
-        setDownloadUrl(urlData.publicUrl);
-        
-        // Auto-download the file
-        // Create a blob URL directly from the PDF output
-        const pdfOutput = pdf.output('blob');
-        const blobUrl = URL.createObjectURL(pdfOutput);
-        
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = uniqueFilename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Clean up the blob URL
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-        
-        return urlData.publicUrl;
-      }
-      return null;
+      setDownloadUrl(urlData.publicUrl);
+      
+      // Auto-download the file
+      // Create a blob URL directly from the PDF output
+      const pdfOutput = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(pdfOutput);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = uniqueFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the blob URL
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      
+      return urlData.publicUrl;
     } catch (error) {
       console.error('Failed to generate PDF:', error);
       return null;

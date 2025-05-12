@@ -54,11 +54,11 @@ const documentFormSchema = z.object({
 interface SettingsFormProps {
   settings: CompanySettings;
   onSave: (settings: CompanySettings) => void;
-  isSaving?: boolean;
 }
 
-const SettingsForm = ({ settings, onSave, isSaving = false }: SettingsFormProps) => {
+const SettingsForm = ({ settings, onSave }: SettingsFormProps) => {
   const [activeTab, setActiveTab] = useState<string>("company");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const companyForm = useForm<z.infer<typeof companyFormSchema>>({
@@ -89,7 +89,9 @@ const SettingsForm = ({ settings, onSave, isSaving = false }: SettingsFormProps)
     },
   });
 
-  function onSubmitCompany(data: z.infer<typeof companyFormSchema>) {    
+  function onSubmitCompany(data: z.infer<typeof companyFormSchema>) {
+    setIsSubmitting(true);
+    
     // Ensure bank details are not optional
     const bankDetails = {
       bankName: data.bankDetails.bankName || "",
@@ -105,17 +107,35 @@ const SettingsForm = ({ settings, onSave, isSaving = false }: SettingsFormProps)
       bankDetails,
     };
     
-    onSave(updatedSettings);
+    // Simulate API call
+    setTimeout(() => {
+      onSave(updatedSettings);
+      setIsSubmitting(false);
+      toast({
+        title: "Company settings updated",
+        description: "Your company information has been updated successfully.",
+      });
+    }, 500);
   }
 
-  function onSubmitDocument(data: z.infer<typeof documentFormSchema>) {    
+  function onSubmitDocument(data: z.infer<typeof documentFormSchema>) {
+    setIsSubmitting(true);
+    
     // Combine with existing settings
     const updatedSettings = {
       ...settings,
       ...data,
     };
     
-    onSave(updatedSettings);
+    // Simulate API call
+    setTimeout(() => {
+      onSave(updatedSettings);
+      setIsSubmitting(false);
+      toast({
+        title: "Document settings updated",
+        description: "Your document settings have been updated successfully.",
+      });
+    }, 500);
   }
 
   return (
@@ -291,8 +311,8 @@ const SettingsForm = ({ settings, onSave, isSaving = false }: SettingsFormProps)
                 </div>
 
                 <div className="flex justify-end">
-                  <Button type="submit" disabled={isSaving}>
-                    {isSaving ? "Saving..." : "Save Changes"}
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Saving..." : "Save Changes"}
                   </Button>
                 </div>
               </form>
@@ -379,8 +399,8 @@ const SettingsForm = ({ settings, onSave, isSaving = false }: SettingsFormProps)
                 </div>
 
                 <div className="flex justify-end">
-                  <Button type="submit" disabled={isSaving}>
-                    {isSaving ? "Saving..." : "Save Changes"}
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Saving..." : "Save Changes"}
                   </Button>
                 </div>
               </form>
