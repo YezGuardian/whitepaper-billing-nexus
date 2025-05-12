@@ -1,4 +1,5 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useReactToPdf } from '@/hooks/use-pdf';
@@ -11,53 +12,60 @@ import StatusBadge from '@/components/StatusBadge';
 import { Edit, Eye, Quote as QuoteIcon, Download, Plus, Trash2 } from 'lucide-react';
 import QuoteForm from '@/components/QuoteForm';
 import QuoteDocument from '@/components/QuoteDocument';
-import { companySettings, clients, quotes as mockQuotes } from '@/data/mockData';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getQuotes, getClients, deleteQuote, getCompanySettings } from '@/services/supabaseService';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const QuotesPage = () => {
-  const [quotes, setQuotes] = useState<Quote[]>(mockQuotes);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // PDF generation setup with our enhanced hook
+  // Fetch data from Supabase
+  const { data: quotes, isLoading: quotesLoading } = useQuery({
+    queryKey: ['quotes'],
+    queryFn: getQuotes
+  });
+
+  const { data: clients, isLoading: clientsLoading } = useQuery({
+    queryKey: ['clients'],
+    queryFn: getClients
+  });
+
+  const { data: companySettings, isLoading: settingsLoading } = useQuery({
+    queryKey: ['companySettings'],
+    queryFn: getCompanySettings
+  });
+
+  // Delete quote mutation
+  const deleteMutation = useMutation({
+    mutationFn: deleteQuote,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      toast({
+        title: 'Quote deleted',
+        description: `Quote has been deleted successfully.`,
+      });
+      setIsDeleteDialogOpen(false);
+      setSelectedQuote(null);
+    },
+    onError: (error) => {
+      console.error('Error deleting quote:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete the quote. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  });
+
+  // PDF generation setup
   const { toPDF, targetRef, loading } = useReactToPdf({
     filename: selectedQuote ? `quote-${selectedQuote.quoteNumber}.pdf` : 'quote.pdf',
   });
-
-  // Handle form submission
-  const handleSaveQuote = (quote: Quote) => {
-    if (quotes.some(q => q.id === quote.id)) {
-      // Update existing quote
-      setQuotes(quotes.map(q => (q.id === quote.id ? quote : q)));
-      toast({
-        title: 'Quote updated',
-        description: `Quote ${quote.quoteNumber} has been updated.`,
-      });
-    } else {
-      // Add new quote
-      setQuotes([...quotes, quote]);
-      toast({
-        title: 'Quote created',
-        description: `Quote ${quote.quoteNumber} has been created.`,
-      });
-    }
-    setIsFormOpen(false);
-  };
-
-  // Handle quote deletion
-  const handleDeleteQuote = () => {
-    if (!selectedQuote) return;
-    
-    setQuotes(quotes.filter(q => q.id !== selectedQuote.id));
-    toast({
-      title: 'Quote deleted',
-      description: `Quote ${selectedQuote.quoteNumber} has been deleted.`,
-    });
-    setIsDeleteDialogOpen(false);
-    setSelectedQuote(null);
-  };
 
   // Open quote form for editing
   const handleEdit = (quote: Quote) => {
@@ -71,15 +79,19 @@ const QuotesPage = () => {
     setIsViewOpen(true);
   };
 
-  // Handle download PDF with our enhanced function
+  // Handle download PDF
   const handleDownload = async () => {
-    const url = await toPDF();
-    if (url) {
-      toast({
-        title: 'PDF Generated',
-        description: 'PDF has been generated and downloaded successfully.',
-      });
-    } else {
+    try {
+      const url = await toPDF();
+      if (url) {
+        toast({
+          title: 'PDF Generated',
+          description: 'PDF has been generated and downloaded successfully.',
+        });
+      } else {
+        throw new Error('Failed to generate PDF');
+      }
+    } catch (error) {
       toast({
         title: 'PDF Generation Failed',
         description: 'Failed to generate PDF. Please try again.',
@@ -92,6 +104,12 @@ const QuotesPage = () => {
   const handleCreate = () => {
     setSelectedQuote(null);
     setIsFormOpen(true);
+  };
+
+  // Handle quote deletion
+  const handleDeleteQuote = () => {
+    if (!selectedQuote) return;
+    deleteMutation.mutate(selectedQuote.id);
   };
 
   // Table columns configuration
@@ -168,6 +186,22 @@ const QuotesPage = () => {
     },
   ];
 
+  if (quotesLoading || clientsLoading || settingsLoading) {
+    return (
+      <MainLayout>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">Quotes</h1>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full" />
+          ))}
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
@@ -178,7 +212,11 @@ const QuotesPage = () => {
         </Button>
       </div>
 
-      <DataTable columns={columns} data={quotes} searchField="quoteNumber" />
+      <DataTable 
+        columns={columns} 
+        data={quotes || []} 
+        searchField="quoteNumber" 
+      />
 
       {/* Quote Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
@@ -188,16 +226,21 @@ const QuotesPage = () => {
               {selectedQuote ? 'Edit Quote' : 'Create Quote'}
             </DialogTitle>
           </DialogHeader>
-          <QuoteForm
-            quote={selectedQuote || undefined}
-            clients={clients}
-            onSave={handleSaveQuote}
-            onCancel={() => setIsFormOpen(false)}
-            companySettings={{
-              quotePrefix: companySettings.quotePrefix,
-              quoteTerms: companySettings.quoteTerms,
-            }}
-          />
+          {companySettings && clients && (
+            <QuoteForm
+              quote={selectedQuote || undefined}
+              clients={clients}
+              onSave={() => {
+                setIsFormOpen(false);
+                queryClient.invalidateQueries({ queryKey: ['quotes'] });
+              }}
+              onCancel={() => setIsFormOpen(false)}
+              companySettings={{
+                quotePrefix: companySettings.quotePrefix,
+                quoteTerms: companySettings.quoteTerms,
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
@@ -239,8 +282,12 @@ const QuotesPage = () => {
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteQuote}>
-              Delete
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteQuote}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>
           </div>
         </DialogContent>

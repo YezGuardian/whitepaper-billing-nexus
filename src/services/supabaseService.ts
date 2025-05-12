@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Client, Invoice, InvoiceItem, Quote, CompanySettings, User } from '@/types';
 
@@ -86,22 +87,30 @@ export const getInvoices = async () => {
   }
   
   // Transform data to match the frontend model
-  const transformedData = data.map(invoice => ({
-    ...invoice,
-    client: invoice.client,
-    invoiceNumber: invoice.invoice_number,
-    items: [], // Will be populated separately
-    issueDate: new Date(invoice.issue_date),
-    dueDate: new Date(invoice.due_date),
-    subtotal: 0, // Will be calculated from items
-    taxTotal: 0, // Will be calculated from items
-    total: invoice.total_amount,
-    notes: invoice.notes || undefined,
-    terms: invoice.terms || undefined,
-    nextGenerationDate: invoice.recurrence !== 'none' ? new Date() : undefined, // This should be fetched or calculated
+  const transformedData = await Promise.all(data.map(async (invoice) => {
+    const items = await getInvoiceItems(invoice.id);
+    
+    // Calculate totals
+    const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const taxTotal = items.reduce((sum, item) => sum + item.taxAmount, 0);
+    
+    return {
+      ...invoice,
+      client: invoice.client,
+      invoiceNumber: invoice.invoice_number,
+      items,
+      issueDate: new Date(invoice.issue_date),
+      dueDate: new Date(invoice.due_date),
+      subtotal,
+      taxTotal,
+      total: invoice.total_amount,
+      notes: invoice.notes || undefined,
+      terms: invoice.terms || undefined,
+      nextGenerationDate: invoice.recurrence !== 'none' && invoice.recurrence ? new Date() : undefined,
+    };
   }));
   
-  return transformedData as unknown as Invoice[];
+  return transformedData as Invoice[];
 };
 
 export const getInvoiceItems = async (invoiceId: string) => {
@@ -163,7 +172,7 @@ export const getInvoiceWithItems = async (id: string) => {
     total: data.total_amount,
     notes: data.notes || undefined,
     terms: data.terms || undefined,
-    nextGenerationDate: data.recurrence !== 'none' ? new Date() : undefined, // This should be fetched or calculated
+    nextGenerationDate: data.recurrence !== 'none' && data.recurrence ? new Date() : undefined,
   };
   
   return transformedData as unknown as Invoice;
@@ -265,12 +274,12 @@ export const getQuotes = async () => {
     throw error;
   }
   
-  // Transform data to match the frontend model (similar to invoices)
+  // Transform data to match the frontend model
   const transformedData = data.map(quote => ({
-    ...quote,
+    id: quote.id,
     client: quote.client,
     quoteNumber: quote.quote_number,
-    items: [], // Would need to be populated if we had a quote_items table
+    items: [], // Would need a quote_items table for proper implementation
     issueDate: new Date(quote.issue_date),
     expiryDate: new Date(quote.expiry_date),
     subtotal: 0, // Would need to be calculated from items
@@ -278,13 +287,48 @@ export const getQuotes = async () => {
     total: quote.total_amount,
     notes: quote.notes || undefined,
     terms: quote.terms || undefined,
+    status: quote.status,
   }));
   
-  return transformedData as unknown as Quote[];
+  return transformedData as Quote[];
 };
 
-// Similar getQuoteWithItems and saveQuote functions would be needed, 
-// following the invoice pattern if we had a quote_items table
+export const saveQuote = async (quote: Omit<Quote, 'id'> & { id?: string }) => {
+  const { data, error } = await supabase
+    .from('quotes')
+    .upsert({
+      id: quote.id,
+      client_id: quote.client.id,
+      quote_number: quote.quoteNumber,
+      issue_date: quote.issueDate.toISOString(),
+      expiry_date: quote.expiryDate.toISOString(),
+      status: quote.status,
+      notes: quote.notes,
+      terms: quote.terms,
+      total_amount: quote.total,
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error saving quote:', error);
+    throw error;
+  }
+  
+  return data as unknown as Quote;
+};
+
+export const deleteQuote = async (id: string) => {
+  const { error } = await supabase
+    .from('quotes')
+    .delete()
+    .eq('id', id);
+  
+  if (error) {
+    console.error('Error deleting quote:', error);
+    throw error;
+  }
+};
 
 // ----- Company Settings Services -----
 export const getCompanySettings = async () => {
@@ -367,7 +411,7 @@ export const updateCompanySettings = async (settings: CompanySettings) => {
       invoice_terms: settings.invoiceTerms,
       quote_terms: settings.quoteTerms,
     })
-    .eq('id', '1'); // Convert number to string to match expected type
+    .eq('id', '1'); // Using string '1' instead of number 1 to match UUID type
     
   if (error) {
     console.error('Error updating company settings:', error);
