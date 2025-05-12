@@ -28,10 +28,10 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
           format: [210, 297], // A4 dimensions in mm
           orientation: 'portrait',
           margin: {
-            top: '20mm',
-            right: '20mm',
-            bottom: '20mm',
-            left: '20mm',
+            top: 20,
+            right: 20,
+            bottom: 20,
+            left: 20,
           },
         },
         canvas: {

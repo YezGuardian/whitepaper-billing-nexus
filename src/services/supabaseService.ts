@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Client, Invoice, InvoiceItem, Quote, CompanySettings, User } from '@/types';
 
@@ -368,7 +367,7 @@ export const updateCompanySettings = async (settings: CompanySettings) => {
       invoice_terms: settings.invoiceTerms,
       quote_terms: settings.quoteTerms,
     })
-    .eq('id', 1); // Assuming there's only one settings record
+    .eq('id', '1'); // Convert number to string to match expected type
     
   if (error) {
     console.error('Error updating company settings:', error);
