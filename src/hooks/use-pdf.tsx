@@ -19,11 +19,10 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
         throw new Error('Target ref is not available');
       }
       
-      // FIX 1: Pass options as a single argument object instead of as a second parameter
-      // The toPDF function expects a single options object that includes both the element and config
+      // Fix 1: Pass options as a single options object with element property
       const blob = await toPDF({
-        element: targetRef.current,
         filename,
+        element: targetRef.current,
         format: [210, 297], // A4 dimensions in mm
         orientation: 'portrait',
         margin: {
@@ -35,8 +34,7 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
         hotfix: { px_to_mm: 0.36 }
       });
       
-      // FIX 2: Since toPDF may return undefined or void, we need to ensure we have a blob
-      // before proceeding with the upload
+      // Fix 2: Check if blob exists before proceeding
       if (!blob) {
         throw new Error('Failed to generate PDF');
       }
@@ -66,7 +64,7 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
       
       // Auto-download the file
       const link = document.createElement('a');
-      link.href = urlData.publicUrl;
+      link.href = URL.createObjectURL(blob);
       link.download = uniqueFilename;
       document.body.appendChild(link);
       link.click();

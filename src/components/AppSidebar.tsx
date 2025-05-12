@@ -1,10 +1,15 @@
+
 import { Link, useLocation } from 'react-router-dom';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
 import { LayoutDashboard, FileText, Quote, Users, Settings, LogOut } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { signOut } from '@/services/authService';
 import Logo from './Logo';
 import { cn } from "@/lib/utils";
+
 const AppSidebar = () => {
   const location = useLocation();
+  
   const menuItems = [{
     title: "Dashboard",
     path: "/",
@@ -26,6 +31,24 @@ const AppSidebar = () => {
     path: "/settings",
     icon: Settings
   }];
+  
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Logout successful",
+        description: "You have been logged out successfully"
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: "Logout failed",
+        description: "Could not log you out. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+  
   return <Sidebar>
       <SidebarHeader className="flex h-14 items-center px-6">
         <Link to="/" className="flex items-center gap-2 font-bold">
@@ -50,11 +73,15 @@ const AppSidebar = () => {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="px-3 py-2">
-        <button className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+        <button 
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          onClick={handleLogout}
+        >
           <LogOut className="h-5 w-5" />
           <span>Logout</span>
         </button>
       </SidebarFooter>
     </Sidebar>;
 };
+
 export default AppSidebar;
