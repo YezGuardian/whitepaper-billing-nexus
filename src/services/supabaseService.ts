@@ -90,6 +90,7 @@ export const getInvoices = async () => {
   const transformedData = data.map(invoice => ({
     ...invoice,
     client: invoice.client,
+    invoiceNumber: invoice.invoice_number,
     items: [], // Will be populated separately
     issueDate: new Date(invoice.issue_date),
     dueDate: new Date(invoice.due_date),
@@ -101,7 +102,7 @@ export const getInvoices = async () => {
     nextGenerationDate: invoice.recurrence !== 'none' ? new Date() : undefined, // This should be fetched or calculated
   }));
   
-  return transformedData as Invoice[];
+  return transformedData as unknown as Invoice[];
 };
 
 export const getInvoiceItems = async (invoiceId: string) => {
@@ -154,6 +155,7 @@ export const getInvoiceWithItems = async (id: string) => {
   const transformedData = {
     ...data,
     client: data.client,
+    invoiceNumber: data.invoice_number,
     items,
     issueDate: new Date(data.issue_date),
     dueDate: new Date(data.due_date),
@@ -165,7 +167,7 @@ export const getInvoiceWithItems = async (id: string) => {
     nextGenerationDate: data.recurrence !== 'none' ? new Date() : undefined, // This should be fetched or calculated
   };
   
-  return transformedData as Invoice;
+  return transformedData as unknown as Invoice;
 };
 
 // Create or update an invoice with its items
@@ -177,8 +179,8 @@ export const saveInvoice = async (invoice: Omit<Invoice, 'id'> & { id?: string }
       id: invoice.id,
       client_id: invoice.client.id,
       invoice_number: invoice.invoiceNumber,
-      issue_date: invoice.issueDate,
-      due_date: invoice.dueDate,
+      issue_date: invoice.issueDate.toISOString(),
+      due_date: invoice.dueDate.toISOString(),
       status: invoice.status,
       notes: invoice.notes,
       terms: invoice.terms,
@@ -268,6 +270,7 @@ export const getQuotes = async () => {
   const transformedData = data.map(quote => ({
     ...quote,
     client: quote.client,
+    quoteNumber: quote.quote_number,
     items: [], // Would need to be populated if we had a quote_items table
     issueDate: new Date(quote.issue_date),
     expiryDate: new Date(quote.expiry_date),
@@ -278,7 +281,7 @@ export const getQuotes = async () => {
     terms: quote.terms || undefined,
   }));
   
-  return transformedData as Quote[];
+  return transformedData as unknown as Quote[];
 };
 
 // Similar getQuoteWithItems and saveQuote functions would be needed, 

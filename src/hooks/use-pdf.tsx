@@ -8,7 +8,7 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
   const [loading, setLoading] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   
-  // In react-to-pdf v2, we use the hook without configuration
+  // Initialize the usePDF hook without options
   const { toPDF } = usePDF();
 
   const generatePdf = async () => {
@@ -19,22 +19,29 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
         throw new Error('Target ref is not available');
       }
       
-      // Fix 1: Pass options as a single options object with element property
+      // Pass the configuration as proper options to toPDF
       const blob = await toPDF({
         filename,
-        element: targetRef.current,
-        format: [210, 297], // A4 dimensions in mm
-        orientation: 'portrait',
-        margin: {
-          top: '20mm',
-          right: '20mm',
-          bottom: '20mm',
-          left: '20mm',
+        page: {
+          // Pass the element directly as an option
+          element: targetRef.current,
+          format: [210, 297], // A4 dimensions in mm
+          orientation: 'portrait',
+          margin: {
+            top: '20mm',
+            right: '20mm',
+            bottom: '20mm',
+            left: '20mm',
+          },
         },
-        hotfix: { px_to_mm: 0.36 }
+        canvas: {
+          // Add any canvas options here
+          mimeType: 'image/png',
+          qualityRatio: 1,
+        },
       });
       
-      // Fix 2: Check if blob exists before proceeding
+      // Check if blob exists before proceeding
       if (!blob) {
         throw new Error('Failed to generate PDF');
       }
