@@ -1,3 +1,4 @@
+
 import { format } from 'date-fns';
 import { Invoice } from '@/types';
 import Logo from './Logo';
@@ -17,6 +18,7 @@ const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ invoice }) => {
               src="/lovable-uploads/a5faa576-4cfa-4071-863c-5cfac82a795f.png" 
               alt="White Paper Systems Logo" 
               className="h-16 w-auto" 
+              crossOrigin="anonymous" // Add crossOrigin attribute for CORS images
             />
           </div>
           <div className="mt-4">
@@ -141,6 +143,7 @@ const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ invoice }) => {
           src="/lovable-uploads/904b88b4-0095-4691-a6d5-af01f553ac8e.png" 
           alt="Signature" 
           className="inline-block h-12" 
+          crossOrigin="anonymous" // Add crossOrigin attribute for CORS images
         />
       </div>
     </div>

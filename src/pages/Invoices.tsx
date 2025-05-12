@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -9,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Invoice } from '@/types';
 import StatusBadge from '@/components/StatusBadge';
-import { Edit, Eye, FileText, Download, Plus, FilePlus, Trash2 } from 'lucide-react';
+import { Edit, Eye, FileText, Download, Plus, Trash2 } from 'lucide-react';
 import InvoiceForm from '@/components/InvoiceForm';
 import InvoiceDocument from '@/components/InvoiceDocument';
 import { companySettings, clients, invoices as mockInvoices } from '@/data/mockData';
@@ -23,7 +22,7 @@ const InvoicesPage = () => {
   const { toast } = useToast();
 
   // PDF generation setup - ensure targetRef is passed to InvoiceDocument
-  const { toPDF, targetRef, loading, downloadUrl } = useReactToPdf({
+  const { toPDF, targetRef, loading } = useReactToPdf({
     filename: selectedInvoice ? `invoice-${selectedInvoice.invoiceNumber}.pdf` : 'invoice.pdf',
   });
 
@@ -72,15 +71,19 @@ const InvoicesPage = () => {
     setIsViewOpen(true);
   };
 
-  // Handle download PDF - correctly calling the toPDF function from our hook
+  // Handle download PDF using our updated approach
   const handleDownload = async () => {
-    const url = await toPDF();
-    if (url) {
-      toast({
-        title: 'PDF Generated',
-        description: 'PDF has been generated and downloaded successfully.',
-      });
-    } else {
+    try {
+      const url = await toPDF();
+      if (url) {
+        toast({
+          title: 'PDF Generated',
+          description: 'PDF has been generated and downloaded successfully.',
+        });
+      } else {
+        throw new Error('Failed to generate PDF');
+      }
+    } catch (error) {
       toast({
         title: 'PDF Generation Failed',
         description: 'Failed to generate PDF. Please try again.',
@@ -228,7 +231,7 @@ const InvoicesPage = () => {
               {loading ? 'Generating...' : 'Download PDF'}
             </Button>
           </DialogHeader>
-          <div ref={targetRef}>
+          <div ref={targetRef} className="bg-white">
             {selectedInvoice && <InvoiceDocument invoice={selectedInvoice} />}
           </div>
         </DialogContent>

@@ -1,6 +1,7 @@
 
 import { useRef, useState } from 'react';
-import { usePDF } from 'react-to-pdf';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { supabase } from '@/integrations/supabase/client';
 
 export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string } = {}) {
@@ -8,9 +9,6 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
   const [loading, setLoading] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   
-  // Initialize the usePDF hook without options
-  const { toPDF } = usePDF();
-
   const generatePdf = async () => {
     try {
       setLoading(true);
@@ -19,32 +17,27 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
         throw new Error('Target ref is not available');
       }
       
-      // Pass the configuration as proper options to toPDF
-      const blob = await toPDF({
-        filename,
-        page: {
-          // Pass the element directly as an option
-          element: targetRef.current,
-          format: [210, 297], // A4 dimensions in mm
-          orientation: 'portrait',
-          margin: {
-            top: 20,
-            right: 20,
-            bottom: 20,
-            left: 20,
-          },
-        },
-        canvas: {
-          // Add any canvas options here
-          mimeType: 'image/png',
-          qualityRatio: 1,
-        },
+      // Use html2canvas to convert the DOM element to a canvas
+      const canvas = await html2canvas(targetRef.current, {
+        scale: 2, // Improves rendering quality
+        useCORS: true, // Allows loading images from other domains
+        logging: false,
+        backgroundColor: '#ffffff'
       });
       
-      // Check if blob exists before proceeding
-      if (!blob) {
-        throw new Error('Failed to generate PDF');
-      }
+      // Calculate dimensions for A4 page (297mm x 210mm at 72dpi)
+      const imgWidth = 210;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      // Create PDF with jsPDF
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Add image to PDF
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      
+      // Generate blob
+      const blob = pdf.output('blob');
       
       // Generate unique filename with timestamp
       const timestamp = new Date().getTime();
@@ -70,12 +63,19 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
       setDownloadUrl(urlData.publicUrl);
       
       // Auto-download the file
+      // Create a blob URL directly from the PDF output
+      const pdfOutput = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(pdfOutput);
+      
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
+      link.href = blobUrl;
       link.download = uniqueFilename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      // Clean up the blob URL
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
       
       return urlData.publicUrl;
     } catch (error) {
