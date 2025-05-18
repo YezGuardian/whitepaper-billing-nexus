@@ -1,4 +1,5 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useReactToPdf } from '@/hooks/use-pdf';
@@ -8,17 +9,26 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Quote } from '@/types';
 import StatusBadge from '@/components/StatusBadge';
-import { Edit, Eye, Quote as QuoteIcon, Download, Plus, Trash2 } from 'lucide-react';
+import { Edit, Eye, Quote as QuoteIcon, Download, Plus, Trash2, Loader } from 'lucide-react';
 import QuoteForm from '@/components/QuoteForm';
 import QuoteDocument from '@/components/QuoteDocument';
-import { companySettings, clients, quotes as mockQuotes } from '@/data/mockData';
+import { 
+  getQuotes, 
+  getClients, 
+  getCompanySettings, 
+  saveQuote, 
+  deleteQuote 
+} from '@/services/supabaseService';
 
 const QuotesPage = () => {
-  const [quotes, setQuotes] = useState<Quote[]>(mockQuotes);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [clients, setClients] = useState([]);
+  const [companySettings, setCompanySettings] = useState(null);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   // PDF generation setup with our enhanced hook
@@ -26,37 +36,86 @@ const QuotesPage = () => {
     filename: selectedQuote ? `quote-${selectedQuote.quoteNumber}.pdf` : 'quote.pdf',
   });
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const [quotesData, clientsData, settings] = await Promise.all([
+          getQuotes(),
+          getClients(),
+          getCompanySettings()
+        ]);
+        
+        setQuotes(quotesData);
+        setClients(clientsData);
+        setCompanySettings(settings);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast({
+          title: 'Failed to load data',
+          description: 'There was an error loading quotes data.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [toast]);
+
   // Handle form submission
-  const handleSaveQuote = (quote: Quote) => {
-    if (quotes.some(q => q.id === quote.id)) {
-      // Update existing quote
-      setQuotes(quotes.map(q => (q.id === quote.id ? quote : q)));
+  const handleSaveQuote = async (quote: Quote) => {
+    try {
+      const savedQuote = await saveQuote(quote);
+      
+      if (quotes.some(q => q.id === quote.id)) {
+        // Update existing quote
+        setQuotes(quotes.map(q => (q.id === quote.id ? savedQuote : q)));
+        toast({
+          title: 'Quote updated',
+          description: `Quote ${quote.quoteNumber} has been updated.`,
+        });
+      } else {
+        // Add new quote
+        setQuotes([...quotes, savedQuote]);
+        toast({
+          title: 'Quote created',
+          description: `Quote ${quote.quoteNumber} has been created.`,
+        });
+      }
+      setIsFormOpen(false);
+    } catch (error) {
+      console.error('Error saving quote:', error);
       toast({
-        title: 'Quote updated',
-        description: `Quote ${quote.quoteNumber} has been updated.`,
-      });
-    } else {
-      // Add new quote
-      setQuotes([...quotes, quote]);
-      toast({
-        title: 'Quote created',
-        description: `Quote ${quote.quoteNumber} has been created.`,
+        title: 'Error',
+        description: 'Failed to save quote. Please try again.',
+        variant: 'destructive',
       });
     }
-    setIsFormOpen(false);
   };
 
   // Handle quote deletion
-  const handleDeleteQuote = () => {
+  const handleDeleteQuote = async () => {
     if (!selectedQuote) return;
     
-    setQuotes(quotes.filter(q => q.id !== selectedQuote.id));
-    toast({
-      title: 'Quote deleted',
-      description: `Quote ${selectedQuote.quoteNumber} has been deleted.`,
-    });
-    setIsDeleteDialogOpen(false);
-    setSelectedQuote(null);
+    try {
+      await deleteQuote(selectedQuote.id);
+      setQuotes(quotes.filter(q => q.id !== selectedQuote.id));
+      toast({
+        title: 'Quote deleted',
+        description: `Quote ${selectedQuote.quoteNumber} has been deleted.`,
+      });
+      setIsDeleteDialogOpen(false);
+      setSelectedQuote(null);
+    } catch (error) {
+      console.error('Error deleting quote:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete quote. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Open quote form for editing
@@ -73,13 +132,17 @@ const QuotesPage = () => {
 
   // Handle download PDF with our enhanced function
   const handleDownload = async () => {
-    const url = await toPDF();
-    if (url) {
-      toast({
-        title: 'PDF Generated',
-        description: 'PDF has been generated and downloaded successfully.',
-      });
-    } else {
+    try {
+      const url = await toPDF();
+      if (url) {
+        toast({
+          title: 'PDF Generated',
+          description: 'PDF has been generated and downloaded successfully.',
+        });
+      } else {
+        throw new Error('Failed to generate PDF');
+      }
+    } catch (error) {
       toast({
         title: 'PDF Generation Failed',
         description: 'Failed to generate PDF. Please try again.',
@@ -108,21 +171,23 @@ const QuotesPage = () => {
       accessorKey: 'issueDate',
       header: 'Issue Date',
       cell: ({ row }: { row: any }) => {
-        return format(new Date(row.original.issueDate), 'dd MMM yyyy');
+        const date = new Date(row.original.issueDate);
+        return isNaN(date.getTime()) ? '-' : format(date, 'dd MMM yyyy');
       },
     },
     {
       accessorKey: 'expiryDate',
       header: 'Expiry Date',
       cell: ({ row }: { row: any }) => {
-        return format(new Date(row.original.expiryDate), 'dd MMM yyyy');
+        const date = new Date(row.original.expiryDate);
+        return isNaN(date.getTime()) ? '-' : format(date, 'dd MMM yyyy');
       },
     },
     {
       accessorKey: 'total',
       header: 'Total',
       cell: ({ row }: { row: any }) => {
-        return `R ${row.original.total.toFixed(2)}`;
+        return `R ${Number(row.original.total).toFixed(2)}`;
       },
     },
     {
@@ -168,6 +233,16 @@ const QuotesPage = () => {
     },
   ];
 
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex justify-center items-center h-[calc(100vh-200px)]">
+          <Loader className="h-8 w-8 animate-spin text-gray-500" />
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
@@ -188,16 +263,18 @@ const QuotesPage = () => {
               {selectedQuote ? 'Edit Quote' : 'Create Quote'}
             </DialogTitle>
           </DialogHeader>
-          <QuoteForm
-            quote={selectedQuote || undefined}
-            clients={clients}
-            onSave={handleSaveQuote}
-            onCancel={() => setIsFormOpen(false)}
-            companySettings={{
-              quotePrefix: companySettings.quotePrefix,
-              quoteTerms: companySettings.quoteTerms,
-            }}
-          />
+          {companySettings && (
+            <QuoteForm
+              quote={selectedQuote || undefined}
+              clients={clients}
+              onSave={handleSaveQuote}
+              onCancel={() => setIsFormOpen(false)}
+              companySettings={{
+                quotePrefix: companySettings.quotePrefix,
+                quoteTerms: companySettings.quoteTerms,
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

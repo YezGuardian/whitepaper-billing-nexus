@@ -1,51 +1,96 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import MainLayout from '@/layouts/MainLayout';
 import { DataTable } from '@/components/DataTable';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Client } from '@/types';
 import ClientForm from '@/components/ClientForm';
-import { clients as mockClients } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
-import { Edit, Plus, Trash2, Users } from 'lucide-react';
+import { Edit, Plus, Trash2, Users, Loader } from 'lucide-react';
+import { getClients, createClient, updateClient, deleteClient } from '@/services/supabaseService';
 
 const ClientsPage = () => {
-  const [clients, setClients] = useState<Client[]>(mockClients);
+  const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        setIsLoading(true);
+        const data = await getClients();
+        setClients(data);
+      } catch (error) {
+        console.error('Error fetching clients:', error);
+        toast({
+          title: 'Failed to load clients',
+          description: 'There was an error loading your clients.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchClients();
+  }, [toast]);
+
   // Handle form submission
-  const handleSaveClient = (client: Client) => {
-    if (clients.some(c => c.id === client.id)) {
-      // Update existing client
-      setClients(clients.map(c => (c.id === client.id ? client : c)));
+  const handleSaveClient = async (client: Client) => {
+    try {
+      if (clients.some(c => c.id === client.id)) {
+        // Update existing client
+        await updateClient(client.id, client);
+        setClients(clients.map(c => (c.id === client.id ? client : c)));
+        toast({
+          title: 'Client updated',
+          description: `${client.name} has been updated.`,
+        });
+      } else {
+        // Add new client
+        const newClient = { ...client, id: uuidv4() };
+        const createdClient = await createClient(newClient);
+        setClients([...clients, createdClient]);
+        toast({
+          title: 'Client created',
+          description: `${client.name} has been added.`,
+        });
+      }
+      setIsFormOpen(false);
+    } catch (error) {
+      console.error('Error saving client:', error);
       toast({
-        title: 'Client updated',
-        description: `${client.name} has been updated.`,
-      });
-    } else {
-      // Add new client
-      setClients([...clients, client]);
-      toast({
-        title: 'Client created',
-        description: `${client.name} has been added.`,
+        title: 'Error',
+        description: 'Failed to save client. Please try again.',
+        variant: 'destructive',
       });
     }
-    setIsFormOpen(false);
   };
 
   // Handle client deletion
-  const handleDeleteClient = () => {
+  const handleDeleteClient = async () => {
     if (!selectedClient) return;
     
-    setClients(clients.filter(c => c.id !== selectedClient.id));
-    toast({
-      title: 'Client deleted',
-      description: `${selectedClient.name} has been removed.`,
-    });
+    try {
+      await deleteClient(selectedClient.id);
+      setClients(clients.filter(c => c.id !== selectedClient.id));
+      toast({
+        title: 'Client deleted',
+        description: `${selectedClient.name} has been removed.`,
+      });
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete client. Please try again.',
+        variant: 'destructive',
+      });
+    }
     setIsDeleteDialogOpen(false);
     setSelectedClient(null);
   };
@@ -121,6 +166,16 @@ const ClientsPage = () => {
       },
     },
   ];
+
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex justify-center items-center h-[calc(100vh-200px)]">
+          <Loader className="h-8 w-8 animate-spin text-gray-500" />
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>

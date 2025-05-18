@@ -1,5 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Client, Invoice, InvoiceItem, Quote, CompanySettings, User } from '@/types';
+import { v4 as uuidv4 } from 'uuid';
 
 // ----- Client Services -----
 export const getClients = async () => {
@@ -12,7 +14,18 @@ export const getClients = async () => {
     throw error;
   }
   
-  return data as Client[];
+  // Convert database model to frontend model
+  const clients: Client[] = data.map(client => ({
+    id: client.id,
+    name: client.name,
+    contactPerson: client.contact_person || undefined,
+    email: client.email,
+    phone: client.phone || undefined,
+    address: client.address,
+    vatNumber: client.vat_number || undefined
+  }));
+  
+  return clients;
 };
 
 export const getClient = async (id: string) => {
@@ -27,13 +40,32 @@ export const getClient = async (id: string) => {
     throw error;
   }
   
-  return data as Client;
+  // Convert database model to frontend model
+  const client: Client = {
+    id: data.id,
+    name: data.name,
+    contactPerson: data.contact_person || undefined,
+    email: data.email,
+    phone: data.phone || undefined,
+    address: data.address,
+    vatNumber: data.vat_number || undefined
+  };
+  
+  return client;
 };
 
-export const createClient = async (client: Omit<Client, 'id'>) => {
+export const createClient = async (client: Omit<Client, 'id'> & { id?: string }) => {
   const { data, error } = await supabase
     .from('clients')
-    .insert(client)
+    .insert({
+      id: client.id || uuidv4(),
+      name: client.name,
+      contact_person: client.contactPerson || null,
+      email: client.email,
+      phone: client.phone || null,
+      address: client.address,
+      vat_number: client.vatNumber || null
+    })
     .select();
   
   if (error) {
@@ -41,13 +73,31 @@ export const createClient = async (client: Omit<Client, 'id'>) => {
     throw error;
   }
   
-  return data[0] as Client;
+  // Convert database model to frontend model
+  const createdClient: Client = {
+    id: data[0].id,
+    name: data[0].name,
+    contactPerson: data[0].contact_person || undefined,
+    email: data[0].email,
+    phone: data[0].phone || undefined,
+    address: data[0].address,
+    vatNumber: data[0].vat_number || undefined
+  };
+  
+  return createdClient;
 };
 
 export const updateClient = async (id: string, updates: Partial<Client>) => {
   const { data, error } = await supabase
     .from('clients')
-    .update(updates)
+    .update({
+      name: updates.name,
+      contact_person: updates.contactPerson || null,
+      email: updates.email,
+      phone: updates.phone || null,
+      address: updates.address,
+      vat_number: updates.vatNumber || null
+    })
     .eq('id', id)
     .select();
   
@@ -56,7 +106,18 @@ export const updateClient = async (id: string, updates: Partial<Client>) => {
     throw error;
   }
   
-  return data[0] as Client;
+  // Convert database model to frontend model
+  const updatedClient: Client = {
+    id: data[0].id,
+    name: data[0].name,
+    contactPerson: data[0].contact_person || undefined,
+    email: data[0].email,
+    phone: data[0].phone || undefined,
+    address: data[0].address,
+    vatNumber: data[0].vat_number || undefined
+  };
+  
+  return updatedClient;
 };
 
 export const deleteClient = async (id: string) => {
@@ -86,47 +147,66 @@ export const getInvoices = async () => {
   }
   
   // Transform data to match the frontend model
-  const transformedData = data.map(invoice => ({
-    ...invoice,
-    client: invoice.client,
-    invoiceNumber: invoice.invoice_number,
-    items: [], // Will be populated separately
-    issueDate: new Date(invoice.issue_date),
-    dueDate: new Date(invoice.due_date),
-    subtotal: 0, // Will be calculated from items
-    taxTotal: 0, // Will be calculated from items
-    total: invoice.total_amount,
-    notes: invoice.notes || undefined,
-    terms: invoice.terms || undefined,
-    nextGenerationDate: invoice.recurrence !== 'none' ? new Date() : undefined, // This should be fetched or calculated
-  }));
+  const invoices: Invoice[] = [];
   
-  return transformedData as unknown as Invoice[];
-};
-
-export const getInvoiceItems = async (invoiceId: string) => {
-  const { data, error } = await supabase
-    .from('invoice_items')
-    .select('*')
-    .eq('invoice_id', invoiceId);
-  
-  if (error) {
-    console.error('Error fetching invoice items:', error);
-    throw error;
+  for (const invoice of data) {
+    // Fetch items for this invoice
+    const { data: itemsData, error: itemsError } = await supabase
+      .from('invoice_items')
+      .select('*')
+      .eq('invoice_id', invoice.id);
+      
+    if (itemsError) {
+      console.error('Error fetching invoice items:', itemsError);
+      continue;
+    }
+    
+    // Transform items to match frontend model
+    const items: InvoiceItem[] = itemsData.map(item => ({
+      id: item.id,
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: Number(item.unit_price),
+      taxRate: Number(item.tax_rate || 0),
+      taxAmount: (item.quantity * Number(item.unit_price) * Number(item.tax_rate || 0)) / 100,
+      total: Number(item.amount)
+    }));
+    
+    // Calculate subtotal and tax total
+    const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const taxTotal = items.reduce((sum, item) => sum + item.taxAmount, 0);
+    
+    // Convert client from database model to frontend model
+    const client: Client = {
+      id: invoice.client.id,
+      name: invoice.client.name,
+      contactPerson: invoice.client.contact_person || undefined,
+      email: invoice.client.email,
+      phone: invoice.client.phone || undefined,
+      address: invoice.client.address,
+      vatNumber: invoice.client.vat_number || undefined
+    };
+    
+    // Create the invoice object
+    invoices.push({
+      id: invoice.id,
+      invoiceNumber: invoice.invoice_number,
+      client,
+      issueDate: new Date(invoice.issue_date),
+      dueDate: new Date(invoice.due_date),
+      items,
+      notes: invoice.notes || undefined,
+      terms: invoice.terms || undefined,
+      subtotal,
+      taxTotal,
+      total: Number(invoice.total_amount),
+      status: invoice.status as any,
+      recurrence: invoice.recurrence as any || 'none',
+      nextGenerationDate: invoice.recurrence && invoice.recurrence !== 'none' ? new Date() : undefined
+    });
   }
   
-  // Transform data to match the frontend model
-  const transformedData = data.map(item => ({
-    id: item.id,
-    description: item.description,
-    quantity: item.quantity,
-    unitPrice: item.unit_price,
-    taxRate: item.tax_rate || 0,
-    taxAmount: (item.quantity * item.unit_price * (item.tax_rate || 0)) / 100,
-    total: item.amount,
-  }));
-  
-  return transformedData as InvoiceItem[];
+  return invoices;
 };
 
 export const getInvoiceWithItems = async (id: string) => {
@@ -144,74 +224,122 @@ export const getInvoiceWithItems = async (id: string) => {
     throw error;
   }
   
-  const items = await getInvoiceItems(id);
+  // Fetch items for this invoice
+  const { data: itemsData, error: itemsError } = await supabase
+    .from('invoice_items')
+    .select('*')
+    .eq('invoice_id', id);
+    
+  if (itemsError) {
+    console.error('Error fetching invoice items:', itemsError);
+    throw itemsError;
+  }
+  
+  // Transform items to match frontend model
+  const items: InvoiceItem[] = itemsData.map(item => ({
+    id: item.id,
+    description: item.description,
+    quantity: item.quantity,
+    unitPrice: Number(item.unit_price),
+    taxRate: Number(item.tax_rate || 0),
+    taxAmount: (item.quantity * Number(item.unit_price) * Number(item.tax_rate || 0)) / 100,
+    total: Number(item.amount)
+  }));
   
   // Calculate subtotal and tax total
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
   const taxTotal = items.reduce((sum, item) => sum + item.taxAmount, 0);
   
-  // Transform data to match the frontend model
-  const transformedData = {
-    ...data,
-    client: data.client,
-    invoiceNumber: data.invoice_number,
-    items,
-    issueDate: new Date(data.issue_date),
-    dueDate: new Date(data.due_date),
-    subtotal,
-    taxTotal,
-    total: data.total_amount,
-    notes: data.notes || undefined,
-    terms: data.terms || undefined,
-    nextGenerationDate: data.recurrence !== 'none' ? new Date() : undefined, // This should be fetched or calculated
+  // Convert client from database model to frontend model
+  const client: Client = {
+    id: data.client.id,
+    name: data.client.name,
+    contactPerson: data.client.contact_person || undefined,
+    email: data.client.email,
+    phone: data.client.phone || undefined,
+    address: data.client.address,
+    vatNumber: data.client.vat_number || undefined
   };
   
-  return transformedData as unknown as Invoice;
+  // Create the invoice object
+  const invoice: Invoice = {
+    id: data.id,
+    invoiceNumber: data.invoice_number,
+    client,
+    issueDate: new Date(data.issue_date),
+    dueDate: new Date(data.due_date),
+    items,
+    notes: data.notes || undefined,
+    terms: data.terms || undefined,
+    subtotal,
+    taxTotal,
+    total: Number(data.total_amount),
+    status: data.status as any,
+    recurrence: data.recurrence as any || 'none',
+    nextGenerationDate: data.recurrence && data.recurrence !== 'none' ? new Date() : undefined
+  };
+  
+  return invoice;
 };
 
 // Create or update an invoice with its items
 export const saveInvoice = async (invoice: Omit<Invoice, 'id'> & { id?: string }) => {
-  // Start a Supabase transaction
+  const id = invoice.id || uuidv4();
+  
+  // Convert dates to ISO string for storage
+  const issueDateISO = invoice.issueDate instanceof Date 
+    ? invoice.issueDate.toISOString().split('T')[0] 
+    : new Date(invoice.issueDate).toISOString().split('T')[0];
+    
+  const dueDateISO = invoice.dueDate instanceof Date 
+    ? invoice.dueDate.toISOString().split('T')[0] 
+    : new Date(invoice.dueDate).toISOString().split('T')[0];
+  
+  // Start a transaction
   const { data: createdInvoice, error: invoiceError } = await supabase
     .from('invoices')
     .upsert({
-      id: invoice.id,
+      id,
       client_id: invoice.client.id,
       invoice_number: invoice.invoiceNumber,
-      issue_date: invoice.issueDate.toISOString(),
-      due_date: invoice.dueDate.toISOString(),
+      issue_date: issueDateISO,
+      due_date: dueDateISO,
       status: invoice.status,
-      notes: invoice.notes,
-      terms: invoice.terms,
-      recurrence: invoice.recurrence,
-      total_amount: invoice.total,
+      notes: invoice.notes || null,
+      terms: invoice.terms || null,
+      recurrence: invoice.recurrence || 'none',
+      total_amount: invoice.total
     })
-    .select()
-    .single();
+    .select();
   
   if (invoiceError) {
     console.error('Error saving invoice:', invoiceError);
     throw invoiceError;
   }
 
-  // Save invoice items
-  if (invoice.items.length > 0) {
-    // If updating, first delete existing items
-    if (invoice.id) {
-      await supabase
-        .from('invoice_items')
-        .delete()
-        .eq('invoice_id', invoice.id);
-    }
+  // If updating, first delete existing items
+  if (invoice.id) {
+    const { error: deleteError } = await supabase
+      .from('invoice_items')
+      .delete()
+      .eq('invoice_id', invoice.id);
     
-    // Insert new items
+    if (deleteError) {
+      console.error('Error deleting invoice items:', deleteError);
+      throw deleteError;
+    }
+  }
+  
+  // Insert new items
+  if (invoice.items.length > 0) {
     const itemsToInsert = invoice.items.map(item => ({
-      invoice_id: createdInvoice.id,
+      id: item.id || uuidv4(),
+      invoice_id: id,
       description: item.description,
       quantity: item.quantity,
       unit_price: item.unitPrice,
-      tax_rate: item.taxRate,
-      amount: item.total,
+      tax_rate: item.taxRate || null,
+      amount: item.total
     }));
     
     const { error: itemsError } = await supabase
@@ -224,22 +352,12 @@ export const saveInvoice = async (invoice: Omit<Invoice, 'id'> & { id?: string }
     }
   }
   
-  return getInvoiceWithItems(createdInvoice.id);
+  // Return the complete invoice with items
+  return getInvoiceWithItems(id);
 };
 
 export const deleteInvoice = async (id: string) => {
-  // First delete associated items due to foreign key constraint
-  const { error: itemsError } = await supabase
-    .from('invoice_items')
-    .delete()
-    .eq('invoice_id', id);
-    
-  if (itemsError) {
-    console.error('Error deleting invoice items:', itemsError);
-    throw itemsError;
-  }
-  
-  // Then delete the invoice
+  // Note: We have added ON DELETE CASCADE to the foreign key, so this should delete related items
   const { error } = await supabase
     .from('invoices')
     .delete()
@@ -265,61 +383,137 @@ export const getQuotes = async () => {
     throw error;
   }
   
-  // Transform data to match the frontend model (similar to invoices)
-  const transformedData = data.map(quote => ({
-    ...quote,
-    client: quote.client,
-    quoteNumber: quote.quote_number,
-    items: [], // Would need to be populated if we had a quote_items table
-    issueDate: new Date(quote.issue_date),
-    expiryDate: new Date(quote.expiry_date),
-    subtotal: 0, // Would need to be calculated from items
-    taxTotal: 0, // Would need to be calculated from items
-    total: quote.total_amount,
-    notes: quote.notes || undefined,
-    terms: quote.terms || undefined,
-  }));
+  // Transform data to match the frontend model
+  const quotes: Quote[] = data.map(quote => {
+    // Convert client from database model to frontend model
+    const client: Client = {
+      id: quote.client.id,
+      name: quote.client.name,
+      contactPerson: quote.client.contact_person || undefined,
+      email: quote.client.email,
+      phone: quote.client.phone || undefined,
+      address: quote.client.address,
+      vatNumber: quote.client.vat_number || undefined
+    };
+    
+    return {
+      id: quote.id,
+      quoteNumber: quote.quote_number,
+      client,
+      issueDate: new Date(quote.issue_date),
+      expiryDate: new Date(quote.expiry_date),
+      items: [], // We'll need to implement quote items support similar to invoices
+      notes: quote.notes || undefined,
+      terms: quote.terms || undefined,
+      subtotal: 0, // Would need to calculate from items
+      taxTotal: 0, // Would need to calculate from items
+      total: Number(quote.total_amount),
+      status: quote.status as any
+    };
+  });
   
-  return transformedData as unknown as Quote[];
+  return quotes;
 };
 
-// Similar getQuoteWithItems and saveQuote functions would be needed, 
-// following the invoice pattern if we had a quote_items table
+export const saveQuote = async (quote: Omit<Quote, 'id'> & { id?: string }) => {
+  const id = quote.id || uuidv4();
+  
+  // Convert dates to ISO string for storage
+  const issueDateISO = quote.issueDate instanceof Date 
+    ? quote.issueDate.toISOString().split('T')[0] 
+    : new Date(quote.issueDate).toISOString().split('T')[0];
+    
+  const expiryDateISO = quote.expiryDate instanceof Date 
+    ? quote.expiryDate.toISOString().split('T')[0] 
+    : new Date(quote.expiryDate).toISOString().split('T')[0];
+  
+  const { data, error } = await supabase
+    .from('quotes')
+    .upsert({
+      id,
+      client_id: quote.client.id,
+      quote_number: quote.quoteNumber,
+      issue_date: issueDateISO,
+      expiry_date: expiryDateISO,
+      status: quote.status,
+      notes: quote.notes || null,
+      terms: quote.terms || null,
+      total_amount: quote.total
+    })
+    .select();
+  
+  if (error) {
+    console.error('Error saving quote:', error);
+    throw error;
+  }
+  
+  // In a real implementation, we would save quote items here too
+  
+  // Return the saved quote
+  const savedQuote: Quote = {
+    id,
+    quoteNumber: quote.quoteNumber,
+    client: quote.client,
+    issueDate: new Date(issueDateISO),
+    expiryDate: new Date(expiryDateISO),
+    items: quote.items,
+    notes: quote.notes,
+    terms: quote.terms,
+    subtotal: quote.subtotal,
+    taxTotal: quote.taxTotal,
+    total: quote.total,
+    status: quote.status
+  };
+  
+  return savedQuote;
+};
+
+export const deleteQuote = async (id: string) => {
+  const { error } = await supabase
+    .from('quotes')
+    .delete()
+    .eq('id', id);
+  
+  if (error) {
+    console.error('Error deleting quote:', error);
+    throw error;
+  }
+};
 
 // ----- Company Settings Services -----
 export const getCompanySettings = async () => {
   const { data, error } = await supabase
     .from('company_settings')
-    .select('*')
-    .single();
+    .select('*');
   
   if (error) {
-    if (error.code === 'PGRST116') {
-      // No settings found, create default
-      return createDefaultCompanySettings();
-    }
     console.error('Error fetching company settings:', error);
     throw error;
   }
   
+  // If no settings exist, create default
+  if (data.length === 0) {
+    return createDefaultCompanySettings();
+  }
+  
   // Transform to match frontend model
   const settings: CompanySettings = {
-    name: data.company_name,
-    email: data.company_email,
-    phone: data.company_phone || '',
-    address: data.company_address,
-    vatNumber: data.company_vat_number || '',
-    website: data.company_website || '',
+    name: data[0].company_name,
+    email: data[0].company_email,
+    phone: data[0].company_phone || '',
+    address: data[0].company_address,
+    vatNumber: data[0].company_vat_number || '',
+    website: data[0].company_website || '',
     bankDetails: {
-      bankName: data.bank_name || '',
-      accountNumber: data.bank_account_number || '',
-      branchCode: data.bank_branch_code || '',
-      accountType: data.bank_account_type || '',
+      bankName: data[0].bank_name || '',
+      accountNumber: data[0].bank_account_number || '',
+      branchCode: data[0].bank_branch_code || '',
+      accountType: data[0].bank_account_type || '',
     },
-    invoicePrefix: data.invoice_prefix,
-    quotePrefix: data.quote_prefix,
-    invoiceTerms: data.invoice_terms || '',
-    quoteTerms: data.quote_terms || '',
+    invoicePrefix: data[0].invoice_prefix,
+    quotePrefix: data[0].quote_prefix,
+    invoiceTerms: data[0].invoice_terms || '',
+    quoteTerms: data[0].quote_terms || '',
   };
   
   return settings;
@@ -337,19 +531,38 @@ const createDefaultCompanySettings = async () => {
   const { data, error } = await supabase
     .from('company_settings')
     .insert(defaultSettings)
-    .select()
-    .single();
+    .select();
     
   if (error) {
     console.error('Error creating default company settings:', error);
     throw error;
   }
   
-  return getCompanySettings();
+  // Transform to match frontend model
+  const settings: CompanySettings = {
+    name: defaultSettings.company_name,
+    email: defaultSettings.company_email,
+    phone: '',
+    address: defaultSettings.company_address,
+    vatNumber: '',
+    website: '',
+    bankDetails: {
+      bankName: '',
+      accountNumber: '',
+      branchCode: '',
+      accountType: '',
+    },
+    invoicePrefix: defaultSettings.invoice_prefix,
+    quotePrefix: defaultSettings.quote_prefix,
+    invoiceTerms: '',
+    quoteTerms: '',
+  };
+  
+  return settings;
 };
 
 export const updateCompanySettings = async (settings: CompanySettings) => {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('company_settings')
     .update({
       company_name: settings.name,
@@ -367,12 +580,14 @@ export const updateCompanySettings = async (settings: CompanySettings) => {
       invoice_terms: settings.invoiceTerms,
       quote_terms: settings.quoteTerms,
     })
-    .eq('id', '1'); // Convert number to string to match expected type
+    .eq('id', 1)
+    .select();
     
   if (error) {
     console.error('Error updating company settings:', error);
     throw error;
   }
   
-  return getCompanySettings();
+  // Return the updated settings
+  return settings;
 };

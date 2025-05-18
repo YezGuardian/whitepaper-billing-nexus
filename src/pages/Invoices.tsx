@@ -1,4 +1,5 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useReactToPdf } from '@/hooks/use-pdf';
@@ -8,17 +9,26 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Invoice } from '@/types';
 import StatusBadge from '@/components/StatusBadge';
-import { Edit, Eye, FileText, Download, Plus, Trash2 } from 'lucide-react';
+import { Edit, Eye, FileText, Download, Plus, Trash2, Loader } from 'lucide-react';
 import InvoiceForm from '@/components/InvoiceForm';
 import InvoiceDocument from '@/components/InvoiceDocument';
-import { companySettings, clients, invoices as mockInvoices } from '@/data/mockData';
+import { 
+  getInvoices, 
+  getClients, 
+  saveInvoice, 
+  deleteInvoice, 
+  getCompanySettings 
+} from '@/services/supabaseService';
 
 const InvoicesPage = () => {
-  const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [clients, setClients] = useState([]);
+  const [companySettings, setCompanySettings] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   // PDF generation setup - ensure targetRef is passed to InvoiceDocument
@@ -26,37 +36,86 @@ const InvoicesPage = () => {
     filename: selectedInvoice ? `invoice-${selectedInvoice.invoiceNumber}.pdf` : 'invoice.pdf',
   });
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const [invoicesData, clientsData, settings] = await Promise.all([
+          getInvoices(),
+          getClients(),
+          getCompanySettings()
+        ]);
+        
+        setInvoices(invoicesData);
+        setClients(clientsData);
+        setCompanySettings(settings);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast({
+          title: 'Failed to load data',
+          description: 'There was an error loading invoices data.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [toast]);
+
   // Handle form submission
-  const handleSaveInvoice = (invoice: Invoice) => {
-    if (invoices.some(inv => inv.id === invoice.id)) {
-      // Update existing invoice
-      setInvoices(invoices.map(inv => (inv.id === invoice.id ? invoice : inv)));
+  const handleSaveInvoice = async (invoice: Invoice) => {
+    try {
+      const savedInvoice = await saveInvoice(invoice);
+      
+      if (invoices.some(inv => inv.id === invoice.id)) {
+        // Update existing invoice
+        setInvoices(invoices.map(inv => (inv.id === invoice.id ? savedInvoice : inv)));
+        toast({
+          title: 'Invoice updated',
+          description: `Invoice ${invoice.invoiceNumber} has been updated.`,
+        });
+      } else {
+        // Add new invoice
+        setInvoices([...invoices, savedInvoice]);
+        toast({
+          title: 'Invoice created',
+          description: `Invoice ${invoice.invoiceNumber} has been created.`,
+        });
+      }
+      setIsFormOpen(false);
+    } catch (error) {
+      console.error('Error saving invoice:', error);
       toast({
-        title: 'Invoice updated',
-        description: `Invoice ${invoice.invoiceNumber} has been updated.`,
-      });
-    } else {
-      // Add new invoice
-      setInvoices([...invoices, invoice]);
-      toast({
-        title: 'Invoice created',
-        description: `Invoice ${invoice.invoiceNumber} has been created.`,
+        title: 'Error',
+        description: 'Failed to save invoice. Please try again.',
+        variant: 'destructive',
       });
     }
-    setIsFormOpen(false);
   };
 
   // Handle invoice deletion
-  const handleDeleteInvoice = () => {
+  const handleDeleteInvoice = async () => {
     if (!selectedInvoice) return;
     
-    setInvoices(invoices.filter(inv => inv.id !== selectedInvoice.id));
-    toast({
-      title: 'Invoice deleted',
-      description: `Invoice ${selectedInvoice.invoiceNumber} has been deleted.`,
-    });
-    setIsDeleteDialogOpen(false);
-    setSelectedInvoice(null);
+    try {
+      await deleteInvoice(selectedInvoice.id);
+      setInvoices(invoices.filter(inv => inv.id !== selectedInvoice.id));
+      toast({
+        title: 'Invoice deleted',
+        description: `Invoice ${selectedInvoice.invoiceNumber} has been deleted.`,
+      });
+      setIsDeleteDialogOpen(false);
+      setSelectedInvoice(null);
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete invoice. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Open invoice form for editing
@@ -112,21 +171,23 @@ const InvoicesPage = () => {
       accessorKey: 'issueDate',
       header: 'Issue Date',
       cell: ({ row }: { row: any }) => {
-        return format(new Date(row.original.issueDate), 'dd MMM yyyy');
+        const date = new Date(row.original.issueDate);
+        return isNaN(date.getTime()) ? '-' : format(date, 'dd MMM yyyy');
       },
     },
     {
       accessorKey: 'dueDate',
       header: 'Due Date',
       cell: ({ row }: { row: any }) => {
-        return format(new Date(row.original.dueDate), 'dd MMM yyyy');
+        const date = new Date(row.original.dueDate);
+        return isNaN(date.getTime()) ? '-' : format(date, 'dd MMM yyyy');
       },
     },
     {
       accessorKey: 'total',
       header: 'Total',
       cell: ({ row }: { row: any }) => {
-        return `R ${row.original.total.toFixed(2)}`;
+        return `R ${Number(row.original.total).toFixed(2)}`;
       },
     },
     {
@@ -179,6 +240,16 @@ const InvoicesPage = () => {
     },
   ];
 
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex justify-center items-center h-[calc(100vh-200px)]">
+          <Loader className="h-8 w-8 animate-spin text-gray-500" />
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
@@ -199,16 +270,18 @@ const InvoicesPage = () => {
               {selectedInvoice ? 'Edit Invoice' : 'Create Invoice'}
             </DialogTitle>
           </DialogHeader>
-          <InvoiceForm
-            invoice={selectedInvoice || undefined}
-            clients={clients}
-            onSave={handleSaveInvoice}
-            onCancel={() => setIsFormOpen(false)}
-            companySettings={{
-              invoicePrefix: companySettings.invoicePrefix,
-              invoiceTerms: companySettings.invoiceTerms,
-            }}
-          />
+          {companySettings && (
+            <InvoiceForm
+              invoice={selectedInvoice || undefined}
+              clients={clients}
+              onSave={handleSaveInvoice}
+              onCancel={() => setIsFormOpen(false)}
+              companySettings={{
+                invoicePrefix: companySettings.invoicePrefix,
+                invoiceTerms: companySettings.invoiceTerms,
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
