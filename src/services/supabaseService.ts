@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Client, Invoice, InvoiceItem, Quote, CompanySettings, User } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -580,7 +579,7 @@ export const updateCompanySettings = async (settings: CompanySettings) => {
       invoice_terms: settings.invoiceTerms,
       quote_terms: settings.quoteTerms,
     })
-    .eq('id', 1)
+    .eq('id', '1')
     .select();
     
   if (error) {
