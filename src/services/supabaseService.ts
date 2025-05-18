@@ -308,7 +308,7 @@ export const saveInvoice = async (invoice: Omit<Invoice, 'id'> & { id?: string }
       notes: invoice.notes || null,
       terms: invoice.terms || null,
       recurrence: invoice.recurrence || 'none',
-      total_amount: invoice.total.toString() // Fix: Convert number to string
+      total_amount: Number(invoice.total) // Fix: Ensure total is a number
     })
     .select();
   
@@ -438,7 +438,7 @@ export const saveQuote = async (quote: Omit<Quote, 'id'> & { id?: string }) => {
       status: quote.status,
       notes: quote.notes || null,
       terms: quote.terms || null,
-      total_amount: quote.total.toString() // Fix: Convert number to string
+      total_amount: Number(quote.total) // Fix: Ensure total is a number
     })
     .select();
   
