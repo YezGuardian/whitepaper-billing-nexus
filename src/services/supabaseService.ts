@@ -383,7 +383,35 @@ export const getQuotes = async () => {
   }
   
   // Transform data to match the frontend model
-  const quotes: Quote[] = data.map(quote => {
+  const quotes: Quote[] = [];
+  
+  for (const quote of data) {
+    // Fetch items for this quote
+    const { data: itemsData, error: itemsError } = await supabase
+      .from('invoice_items')
+      .select('*')
+      .eq('invoice_id', quote.id);
+      
+    if (itemsError) {
+      console.error('Error fetching quote items:', itemsError);
+      continue;
+    }
+    
+    // Transform items to match frontend model
+    const items: InvoiceItem[] = itemsData ? itemsData.map(item => ({
+      id: item.id,
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: Number(item.unit_price),
+      taxRate: Number(item.tax_rate || 0),
+      taxAmount: (item.quantity * Number(item.unit_price) * Number(item.tax_rate || 0)) / 100,
+      total: Number(item.amount)
+    })) : [];
+    
+    // Calculate subtotal and tax total
+    const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const taxTotal = items.reduce((sum, item) => sum + item.taxAmount, 0);
+    
     // Convert client from database model to frontend model
     const client: Client = {
       id: quote.client.id,
@@ -395,21 +423,22 @@ export const getQuotes = async () => {
       vatNumber: quote.client.vat_number || undefined
     };
     
-    return {
+    // Create the quote object
+    quotes.push({
       id: quote.id,
       quoteNumber: quote.quote_number,
       client,
       issueDate: new Date(quote.issue_date),
       expiryDate: new Date(quote.expiry_date),
-      items: [], // We'll need to implement quote items support similar to invoices
+      items,
       notes: quote.notes || undefined,
       terms: quote.terms || undefined,
-      subtotal: 0, // Would need to calculate from items
-      taxTotal: 0, // Would need to calculate from items
+      subtotal,
+      taxTotal,
       total: Number(quote.total_amount),
       status: quote.status as any
-    };
-  });
+    });
+  }
   
   return quotes;
 };
@@ -426,6 +455,7 @@ export const saveQuote = async (quote: Omit<Quote, 'id'> & { id?: string }) => {
     ? quote.expiryDate.toISOString().split('T')[0] 
     : new Date(quote.expiryDate).toISOString().split('T')[0];
   
+  // First save the quote
   const { data, error } = await supabase
     .from('quotes')
     .upsert({
@@ -437,7 +467,7 @@ export const saveQuote = async (quote: Omit<Quote, 'id'> & { id?: string }) => {
       status: quote.status,
       notes: quote.notes || null,
       terms: quote.terms || null,
-      total_amount: Number(quote.total) // Fix: Ensure total is a number
+      total_amount: Number(quote.total) // Ensure total is a number
     })
     .select();
   
@@ -446,9 +476,42 @@ export const saveQuote = async (quote: Omit<Quote, 'id'> & { id?: string }) => {
     throw error;
   }
   
-  // In a real implementation, we would save quote items here too
+  // If updating, first delete existing items
+  if (quote.id) {
+    const { error: deleteError } = await supabase
+      .from('invoice_items')
+      .delete()
+      .eq('invoice_id', quote.id);
+    
+    if (deleteError) {
+      console.error('Error deleting quote items:', deleteError);
+      throw deleteError;
+    }
+  }
   
-  // Return the saved quote
+  // Insert new items
+  if (quote.items.length > 0) {
+    const itemsToInsert = quote.items.map(item => ({
+      id: item.id || uuidv4(),
+      invoice_id: id,
+      description: item.description,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+      tax_rate: item.taxRate || null,
+      amount: item.total
+    }));
+    
+    const { error: itemsError } = await supabase
+      .from('invoice_items')
+      .insert(itemsToInsert);
+      
+    if (itemsError) {
+      console.error('Error saving quote items:', itemsError);
+      throw itemsError;
+    }
+  }
+  
+  // Return the saved quote with its items
   const savedQuote: Quote = {
     id,
     quoteNumber: quote.quoteNumber,
@@ -468,6 +531,18 @@ export const saveQuote = async (quote: Omit<Quote, 'id'> & { id?: string }) => {
 };
 
 export const deleteQuote = async (id: string) => {
+  // First delete related items
+  const { error: itemsError } = await supabase
+    .from('invoice_items')
+    .delete()
+    .eq('invoice_id', id);
+  
+  if (itemsError) {
+    console.error('Error deleting quote items:', itemsError);
+    // Continue anyway to try to delete the quote
+  }
+  
+  // Then delete the quote
   const { error } = await supabase
     .from('quotes')
     .delete()
@@ -481,83 +556,129 @@ export const deleteQuote = async (id: string) => {
 
 // ----- Company Settings Services -----
 export const getCompanySettings = async () => {
-  const { data, error } = await supabase
-    .from('company_settings')
-    .select('*');
-  
-  if (error) {
-    console.error('Error fetching company settings:', error);
-    throw error;
+  try {
+    const { data, error } = await supabase
+      .from('company_settings')
+      .select('*');
+    
+    if (error) {
+      console.error('Error fetching company settings:', error);
+      throw error;
+    }
+    
+    // If no settings exist, create default
+    if (data.length === 0) {
+      return createDefaultCompanySettings();
+    }
+    
+    // Transform to match frontend model
+    const settings: CompanySettings = {
+      name: data[0].company_name,
+      email: data[0].company_email,
+      phone: data[0].company_phone || '',
+      address: data[0].company_address,
+      vatNumber: data[0].company_vat_number || '',
+      website: data[0].company_website || '',
+      bankDetails: {
+        bankName: data[0].bank_name || '',
+        accountNumber: data[0].bank_account_number || '',
+        branchCode: data[0].bank_branch_code || '',
+        accountType: data[0].bank_account_type || '',
+      },
+      invoicePrefix: data[0].invoice_prefix,
+      quotePrefix: data[0].quote_prefix,
+      invoiceTerms: data[0].invoice_terms || '',
+      quoteTerms: data[0].quote_terms || '',
+    };
+    
+    return settings;
+  } catch (error) {
+    console.error('Error in getCompanySettings:', error);
+    // Return default settings as fallback
+    return {
+      name: 'Your Company',
+      email: 'contact@yourcompany.com',
+      phone: '',
+      address: 'Your Company Address',
+      vatNumber: '',
+      website: '',
+      bankDetails: {
+        bankName: '',
+        accountNumber: '',
+        branchCode: '',
+        accountType: '',
+      },
+      invoicePrefix: 'INV',
+      quotePrefix: 'QT',
+      invoiceTerms: '',
+      quoteTerms: '',
+    };
   }
-  
-  // If no settings exist, create default
-  if (data.length === 0) {
-    return createDefaultCompanySettings();
-  }
-  
-  // Transform to match frontend model
-  const settings: CompanySettings = {
-    name: data[0].company_name,
-    email: data[0].company_email,
-    phone: data[0].company_phone || '',
-    address: data[0].company_address,
-    vatNumber: data[0].company_vat_number || '',
-    website: data[0].company_website || '',
-    bankDetails: {
-      bankName: data[0].bank_name || '',
-      accountNumber: data[0].bank_account_number || '',
-      branchCode: data[0].bank_branch_code || '',
-      accountType: data[0].bank_account_type || '',
-    },
-    invoicePrefix: data[0].invoice_prefix,
-    quotePrefix: data[0].quote_prefix,
-    invoiceTerms: data[0].invoice_terms || '',
-    quoteTerms: data[0].quote_terms || '',
-  };
-  
-  return settings;
 };
 
 const createDefaultCompanySettings = async () => {
-  const defaultSettings = {
-    company_name: 'Your Company',
-    company_email: 'contact@yourcompany.com',
-    company_address: 'Your Company Address',
-    invoice_prefix: 'INV',
-    quote_prefix: 'QT',
-  };
-  
-  const { data, error } = await supabase
-    .from('company_settings')
-    .insert(defaultSettings)
-    .select();
+  try {
+    const defaultSettings = {
+      company_name: 'Your Company',
+      company_email: 'contact@yourcompany.com',
+      company_address: 'Your Company Address',
+      invoice_prefix: 'INV',
+      quote_prefix: 'QT',
+    };
     
-  if (error) {
-    console.error('Error creating default company settings:', error);
-    throw error;
+    const { data, error } = await supabase
+      .from('company_settings')
+      .insert(defaultSettings)
+      .select();
+      
+    if (error) {
+      console.error('Error creating default company settings:', error);
+      throw error;
+    }
+    
+    // Transform to match frontend model
+    const settings: CompanySettings = {
+      name: defaultSettings.company_name,
+      email: defaultSettings.company_email,
+      phone: '',
+      address: defaultSettings.company_address,
+      vatNumber: '',
+      website: '',
+      bankDetails: {
+        bankName: '',
+        accountNumber: '',
+        branchCode: '',
+        accountType: '',
+      },
+      invoicePrefix: defaultSettings.invoice_prefix,
+      quotePrefix: defaultSettings.quote_prefix,
+      invoiceTerms: '',
+      quoteTerms: '',
+    };
+    
+    return settings;
+  } catch (error) {
+    console.error('Error in createDefaultCompanySettings:', error);
+    // Return default settings object as fallback
+    return {
+      name: 'Your Company',
+      email: 'contact@yourcompany.com',
+      phone: '',
+      address: 'Your Company Address',
+      vatNumber: '',
+      website: '',
+      bankDetails: {
+        bankName: '',
+        accountNumber: '',
+        branchCode: '',
+        accountType: '',
+      },
+      invoicePrefix: 'INV',
+      quotePrefix: 'QT',
+      invoiceTerms: '',
+      quoteTerms: '',
+    };
   }
-  
-  // Transform to match frontend model
-  const settings: CompanySettings = {
-    name: defaultSettings.company_name,
-    email: defaultSettings.company_email,
-    phone: '',
-    address: defaultSettings.company_address,
-    vatNumber: '',
-    website: '',
-    bankDetails: {
-      bankName: '',
-      accountNumber: '',
-      branchCode: '',
-      accountType: '',
-    },
-    invoicePrefix: defaultSettings.invoice_prefix,
-    quotePrefix: defaultSettings.quote_prefix,
-    invoiceTerms: '',
-    quoteTerms: '',
-  };
-  
-  return settings;
 };
 
 export const updateCompanySettings = async (settings: CompanySettings) => {

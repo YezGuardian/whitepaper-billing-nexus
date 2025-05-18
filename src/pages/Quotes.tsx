@@ -40,20 +40,21 @@ const QuotesPage = () => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const [quotesData, clientsData, settings] = await Promise.all([
-          getQuotes(),
-          getClients(),
-          getCompanySettings()
-        ]);
         
-        setQuotes(quotesData);
+        // Fetch data in sequence rather than parallel to avoid race conditions
+        const clientsData = await getClients();
         setClients(clientsData);
+        
+        const settings = await getCompanySettings();
         setCompanySettings(settings);
+        
+        const quotesData = await getQuotes();
+        setQuotes(quotesData);
       } catch (error) {
         console.error('Error fetching data:', error);
         toast({
           title: 'Failed to load data',
-          description: 'There was an error loading quotes data.',
+          description: 'There was an error loading quotes data. Please try again.',
           variant: 'destructive',
         });
       } finally {
@@ -256,14 +257,14 @@ const QuotesPage = () => {
       <DataTable columns={columns} data={quotes} searchField="quoteNumber" />
 
       {/* Quote Form Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedQuote ? 'Edit Quote' : 'Create Quote'}
-            </DialogTitle>
-          </DialogHeader>
-          {companySettings && (
+      {companySettings && (
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>
+                {selectedQuote ? 'Edit Quote' : 'Create Quote'}
+              </DialogTitle>
+            </DialogHeader>
             <QuoteForm
               quote={selectedQuote || undefined}
               clients={clients}
@@ -274,9 +275,9 @@ const QuotesPage = () => {
                 quoteTerms: companySettings.quoteTerms,
               }}
             />
-          )}
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Quote View Dialog */}
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>

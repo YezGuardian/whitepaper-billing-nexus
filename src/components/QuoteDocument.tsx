@@ -1,7 +1,7 @@
+
 import { format } from 'date-fns';
 import { Quote } from '@/types';
 import Logo from './Logo';
-import { companySettings } from '@/data/mockData';
 
 interface QuoteDocumentProps {
   quote: Quote;
@@ -15,17 +15,17 @@ const QuoteDocument: React.FC<QuoteDocumentProps> = ({ quote }) => {
           <div className="mb-4">
             <img 
               src="/lovable-uploads/a5faa576-4cfa-4071-863c-5cfac82a795f.png" 
-              alt="White Paper Systems Logo" 
+              alt="Company Logo" 
               className="h-16 w-auto" 
             />
           </div>
           <div className="mt-4">
-            <div className="font-bold">{companySettings.name}</div>
-            <div className="text-sm text-gray-500 whitespace-pre-line">{companySettings.address}</div>
-            <div className="text-sm text-gray-500">{companySettings.phone}</div>
-            <div className="text-sm text-gray-500">{companySettings.email}</div>
-            <div className="text-sm text-gray-500">{companySettings.website}</div>
-            <div className="text-sm text-gray-500">VAT: {companySettings.vatNumber}</div>
+            <div className="font-bold">White Paper Systems</div>
+            <div className="text-sm text-gray-500 whitespace-pre-line">123 Business Street\nPretoria\nSouth Africa</div>
+            <div className="text-sm text-gray-500">+27 12 345 6789</div>
+            <div className="text-sm text-gray-500">info@whitepapersystems.com</div>
+            <div className="text-sm text-gray-500">www.whitepapersystems.com</div>
+            <div className="text-sm text-gray-500">VAT: ZA123456789</div>
           </div>
         </div>
         <div className="text-right">
@@ -123,7 +123,7 @@ const QuoteDocument: React.FC<QuoteDocumentProps> = ({ quote }) => {
 
       <div className="mt-8">
         <p className="text-sm text-gray-500">
-          To accept this quotation, please sign below and return to {companySettings.email} or contact us at {companySettings.phone}.
+          To accept this quotation, please sign below and return to info@whitepapersystems.com or contact us at +27 12 345 6789.
         </p>
       </div>
 
@@ -135,7 +135,7 @@ const QuoteDocument: React.FC<QuoteDocumentProps> = ({ quote }) => {
             <div className="mt-2 text-sm text-gray-500">Signature & Date</div>
           </div>
           <div>
-            <div className="text-sm font-medium">For {companySettings.name}:</div>
+            <div className="text-sm font-medium">For White Paper Systems:</div>
             <div className="mt-2">
               <img 
                 src="/lovable-uploads/904b88b4-0095-4691-a6d5-af01f553ac8e.png" 
