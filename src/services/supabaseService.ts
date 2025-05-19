@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Client, CompanySettings, Invoice, InvoiceItem, Quote } from "@/types";
 import { v4 as uuidv4 } from "uuid";
@@ -392,23 +391,26 @@ export const saveQuote = async (quote: Quote): Promise<Quote> => {
     }
     
     // Save the quote items
-    const itemsData = quote.items.map(item => ({
-      id: item.id || uuidv4(),
-      invoice_id: quoteId,  // This is the key field that needs to be correct
-      description: item.description,
-      quantity: item.quantity,
-      unit_price: item.unitPrice,
-      tax_rate: item.taxRate,
-      amount: item.quantity * item.unitPrice * (1 + item.taxRate / 100)
-    }));
-    
-    const { error: itemsError } = await supabase
-      .from('invoice_items')
-      .insert(itemsData);
-    
-    if (itemsError) {
-      console.error('Error saving quote items:', itemsError);
-      throw itemsError;
+    for (const item of quote.items) {
+      const itemData = {
+        id: item.id || uuidv4(),
+        invoice_id: quoteId,
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        tax_rate: item.taxRate,
+        amount: item.quantity * item.unitPrice * (1 + item.taxRate / 100)
+      };
+      
+      // Insert items one by one to prevent potential batch issues
+      const { error } = await supabase
+        .from('invoice_items')
+        .insert([itemData]);
+      
+      if (error) {
+        console.error('Error saving quote item:', error);
+        throw error;
+      }
     }
     
     // Return the saved quote with updated ID

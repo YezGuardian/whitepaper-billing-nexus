@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -129,59 +128,62 @@ const QuoteForm: React.FC<QuoteFormProps> = ({
     return calculateSubtotal() + calculateTaxTotal();
   };
 
-  const onSubmit = (data: z.infer<typeof quoteFormSchema>) => {
+  const onSubmit = async (data: z.infer<typeof quoteFormSchema>) => {
     setIsSubmitting(true);
-
-    // Find the selected client
-    const selectedClient = clients.find(client => client.id === data.clientId);
     
-    if (!selectedClient) {
-      console.error("Client not found");
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Prepare the items with calculated values
-    const preparedItems = data.items.map(item => {
-      const itemTotal = item.quantity * item.unitPrice;
-      const taxAmount = (itemTotal * item.taxRate) / 100;
+    try {
+      // Find the selected client
+      const selectedClient = clients.find(client => client.id === data.clientId);
       
-      return {
-        id: item.id || uuidv4(),
-        description: item.description,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        taxRate: item.taxRate,
-        taxAmount,
-        total: itemTotal + taxAmount,
+      if (!selectedClient) {
+        console.error("Client not found");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Prepare the items with calculated values
+      const preparedItems = data.items.map(item => {
+        const itemTotal = item.quantity * item.unitPrice;
+        const taxAmount = (itemTotal * item.taxRate) / 100;
+        
+        return {
+          id: item.id || uuidv4(),
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          taxRate: item.taxRate,
+          taxAmount,
+          total: itemTotal + taxAmount,
+        };
+      });
+
+      const subtotal = calculateSubtotal();
+      const taxTotal = calculateTaxTotal();
+      const total = calculateTotal();
+
+      // Create the quote object
+      const quoteData: Quote = {
+        id: quote?.id || uuidv4(),
+        quoteNumber: data.quoteNumber,
+        client: selectedClient,
+        issueDate: data.issueDate,
+        expiryDate: data.expiryDate,
+        items: preparedItems,
+        notes: data.notes,
+        terms: data.terms,
+        subtotal,
+        taxTotal,
+        total,
+        status: data.status,
       };
-    });
 
-    const subtotal = calculateSubtotal();
-    const taxTotal = calculateTaxTotal();
-    const total = calculateTotal();
-
-    // Create the quote object
-    const quoteData: Quote = {
-      id: quote?.id || uuidv4(),
-      quoteNumber: data.quoteNumber,
-      client: selectedClient,
-      issueDate: data.issueDate,
-      expiryDate: data.expiryDate,
-      items: preparedItems,
-      notes: data.notes,
-      terms: data.terms,
-      subtotal,
-      taxTotal,
-      total,
-      status: data.status,
-    };
-
-    // Simulate API call
-    setTimeout(() => {
-      onSave(quoteData);
+      // Save the quote
+      await onSave(quoteData);
+    } catch (error) {
+      console.error("Error submitting quote:", error);
+    } finally {
       setIsSubmitting(false);
-    }, 500);
+    }
   };
 
   return (

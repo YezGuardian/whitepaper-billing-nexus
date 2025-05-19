@@ -2,7 +2,6 @@
 import { useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { supabase } from '@/integrations/supabase/client';
 
 export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string } = {}) {
   const targetRef = useRef<HTMLDivElement>(null);
@@ -43,30 +42,11 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
       const timestamp = new Date().getTime();
       const uniqueFilename = `${filename.replace('.pdf', '')}_${timestamp}.pdf`;
       
-      // Upload to Supabase storage
-      const { data, error } = await supabase.storage
-        .from('pdfs')
-        .upload(uniqueFilename, blob, {
-          contentType: 'application/pdf',
-          cacheControl: '3600'
-        });
+      // Skip Supabase storage upload which causes 403 error
+      // Instead, directly create blob URL and download
+      const blobUrl = URL.createObjectURL(blob);
       
-      if (error) {
-        throw error;
-      }
-      
-      // Get public URL for the uploaded file
-      const { data: urlData } = supabase.storage
-        .from('pdfs')
-        .getPublicUrl(uniqueFilename);
-      
-      setDownloadUrl(urlData.publicUrl);
-      
-      // Auto-download the file
-      // Create a blob URL directly from the PDF output
-      const pdfOutput = pdf.output('blob');
-      const blobUrl = URL.createObjectURL(pdfOutput);
-      
+      // Create download link
       const link = document.createElement('a');
       link.href = blobUrl;
       link.download = uniqueFilename;
@@ -74,10 +54,10 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
       link.click();
       document.body.removeChild(link);
       
-      // Clean up the blob URL
+      // Clean up blob URL
       setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
       
-      return urlData.publicUrl;
+      return blobUrl;
     } catch (error) {
       console.error('Failed to generate PDF:', error);
       return null;
