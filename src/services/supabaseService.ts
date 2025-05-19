@@ -517,6 +517,9 @@ export const getInvoices = async (): Promise<Invoice[]> => {
         vatNumber: invoice.client.vat_number || undefined
       };
       
+      // Cast the invoice to include any to handle potential type mismatches
+      const invoiceData = invoice as any;
+      
       // Create the invoice object
       invoices.push({
         id: invoice.id,
@@ -532,7 +535,7 @@ export const getInvoices = async (): Promise<Invoice[]> => {
         total: Number(invoice.total_amount),
         status: invoice.status as any,
         recurrence: (invoice.recurrence as "none" | "weekly" | "monthly" | "quarterly" | "yearly") || "none",
-        nextGenerationDate: invoice.next_generation_date ? new Date(invoice.next_generation_date) : undefined
+        nextGenerationDate: invoiceData.next_generation_date ? new Date(invoiceData.next_generation_date) : undefined
       });
     }
     
