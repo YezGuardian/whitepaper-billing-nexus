@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -6,7 +5,7 @@ import { useReactToPdf } from '@/hooks/use-pdf';
 import MainLayout from '@/layouts/MainLayout';
 import { DataTable } from '@/components/DataTable';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Quote } from '@/types';
 import StatusBadge from '@/components/StatusBadge';
 import { Edit, Eye, Quote as QuoteIcon, Download, Plus, Trash2, Loader } from 'lucide-react';
@@ -264,6 +263,9 @@ const QuotesPage = () => {
               <DialogTitle>
                 {selectedQuote ? 'Edit Quote' : 'Create Quote'}
               </DialogTitle>
+              <DialogDescription>
+                Fill out the form below to {selectedQuote ? 'update' : 'create'} a quote.
+              </DialogDescription>
             </DialogHeader>
             <QuoteForm
               quote={selectedQuote || undefined}
@@ -298,8 +300,11 @@ const QuotesPage = () => {
               {loading ? 'Generating...' : 'Download PDF'}
             </Button>
           </DialogHeader>
+          <DialogDescription>
+            Quote details for {selectedQuote?.client?.name}.
+          </DialogDescription>
           <div ref={targetRef}>
-            {selectedQuote && <QuoteDocument quote={selectedQuote} />}
+            {selectedQuote && <QuoteDocument quote={selectedQuote} companySettings={companySettings} />}
           </div>
         </DialogContent>
       </Dialog>
@@ -309,6 +314,9 @@ const QuotesPage = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Quote</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone.
+            </DialogDescription>
           </DialogHeader>
           <p>
             Are you sure you want to delete quote {selectedQuote?.quoteNumber}? This action cannot be undone.

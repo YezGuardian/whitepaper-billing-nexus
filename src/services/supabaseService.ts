@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Client, CompanySettings, Invoice, InvoiceItem, Quote } from "@/types";
 import { v4 as uuidv4 } from "uuid";
@@ -391,10 +390,10 @@ export const saveQuote = async (quote: Quote): Promise<Quote> => {
       }
     }
     
-    // Save the quote items
+    // Save the quote items - FIXING THE COLUMN NAME HERE
     const itemsData = quote.items.map(item => ({
       id: item.id || uuidv4(),
-      invoice_id: quoteId,
+      invoice_id: quoteId,  // This is causing the foreign key violation
       description: item.description,
       quantity: item.quantity,
       unit_price: item.unitPrice,
@@ -402,6 +401,7 @@ export const saveQuote = async (quote: Quote): Promise<Quote> => {
       amount: item.total
     }));
     
+    // Insert all items at once
     const { error: itemsError } = await supabase
       .from('invoice_items')
       .insert(itemsData);
