@@ -45,6 +45,7 @@ export function useReactToPdf({ filename = 'document.pdf' }: { filename?: string
       // Skip Supabase storage upload which causes 403 error
       // Instead, directly create blob URL and download
       const blobUrl = URL.createObjectURL(blob);
+      setDownloadUrl(blobUrl);
       
       // Create download link
       const link = document.createElement('a');

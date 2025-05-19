@@ -389,8 +389,10 @@ export const saveQuote = async (quote: Quote): Promise<Quote> => {
         throw deleteError;
       }
     }
+
+    console.log('Quote saved successfully, now saving items...');
     
-    // Save the quote items
+    // Save the quote items one by one to avoid batch issues
     for (const item of quote.items) {
       const itemData = {
         id: item.id || uuidv4(),
@@ -399,10 +401,10 @@ export const saveQuote = async (quote: Quote): Promise<Quote> => {
         quantity: item.quantity,
         unit_price: item.unitPrice,
         tax_rate: item.taxRate,
-        amount: item.quantity * item.unitPrice * (1 + item.taxRate / 100)
+        amount: item.total || (item.quantity * item.unitPrice * (1 + item.taxRate / 100))
       };
       
-      // Insert items one by one to prevent potential batch issues
+      // Insert each item individually
       const { error } = await supabase
         .from('invoice_items')
         .insert([itemData]);
@@ -412,6 +414,8 @@ export const saveQuote = async (quote: Quote): Promise<Quote> => {
         throw error;
       }
     }
+    
+    console.log('All quote items saved successfully');
     
     // Return the saved quote with updated ID
     return {

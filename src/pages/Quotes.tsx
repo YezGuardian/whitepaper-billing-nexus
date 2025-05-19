@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -68,6 +67,7 @@ const QuotesPage = () => {
   // Handle form submission
   const handleSaveQuote = async (quote: Quote) => {
     try {
+      console.log("Attempting to save quote:", quote);
       const savedQuote = await saveQuote(quote);
       
       if (quotes.some(q => q.id === quote.id)) {

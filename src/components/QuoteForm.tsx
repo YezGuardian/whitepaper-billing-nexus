@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { v4 as uuidv4 } from 'uuid';
+import { useToast } from "@/hooks/use-toast";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -67,6 +68,7 @@ const QuoteForm: React.FC<QuoteFormProps> = ({
   companySettings,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   // Set up the form with the schema and default values
   const form = useForm<z.infer<typeof quoteFormSchema>>({
@@ -137,6 +139,11 @@ const QuoteForm: React.FC<QuoteFormProps> = ({
       
       if (!selectedClient) {
         console.error("Client not found");
+        toast({
+          title: "Error",
+          description: "Selected client not found",
+          variant: "destructive"
+        });
         setIsSubmitting(false);
         return;
       }
@@ -178,9 +185,21 @@ const QuoteForm: React.FC<QuoteFormProps> = ({
       };
 
       // Save the quote
+      console.log("Submitting quote:", quoteData);
       await onSave(quoteData);
+      
+      toast({
+        title: quote?.id ? "Quote Updated" : "Quote Created",
+        description: `Quote ${data.quoteNumber} has been ${quote?.id ? "updated" : "created"} successfully.`,
+      });
+      
     } catch (error) {
       console.error("Error submitting quote:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save quote. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
