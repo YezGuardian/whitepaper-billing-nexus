@@ -8,6 +8,10 @@ interface QuoteDocumentProps {
 }
 
 const QuoteDocument: React.FC<QuoteDocumentProps> = ({ quote }) => {
+  if (!quote) {
+    return <div className="p-8">Loading quote data...</div>;
+  }
+
   return (
     <div className="pdf-content bg-white p-8 shadow-lg rounded-lg">
       <div className="flex justify-between items-start">
@@ -50,16 +54,16 @@ const QuoteDocument: React.FC<QuoteDocumentProps> = ({ quote }) => {
       <div className="mt-8">
         <h2 className="text-lg font-medium text-wps-blue">Prepared For</h2>
         <div className="mt-2">
-          <div className="font-medium">{quote.client.name}</div>
-          {quote.client.contactPerson && (
+          <div className="font-medium">{quote.client?.name}</div>
+          {quote.client?.contactPerson && (
             <div className="text-sm text-gray-500">Attn: {quote.client.contactPerson}</div>
           )}
-          <div className="text-sm text-gray-500 whitespace-pre-line">{quote.client.address}</div>
-          <div className="text-sm text-gray-500">{quote.client.email}</div>
-          {quote.client.phone && (
+          <div className="text-sm text-gray-500 whitespace-pre-line">{quote.client?.address}</div>
+          <div className="text-sm text-gray-500">{quote.client?.email}</div>
+          {quote.client?.phone && (
             <div className="text-sm text-gray-500">{quote.client.phone}</div>
           )}
-          {quote.client.vatNumber && (
+          {quote.client?.vatNumber && (
             <div className="text-sm text-gray-500">VAT: {quote.client.vatNumber}</div>
           )}
         </div>
@@ -77,7 +81,7 @@ const QuoteDocument: React.FC<QuoteDocumentProps> = ({ quote }) => {
             </tr>
           </thead>
           <tbody>
-            {quote.items.map((item, index) => (
+            {quote.items && quote.items.map((item, index) => (
               <tr key={item.id} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                 <td className="py-2 px-4 text-left">{item.description}</td>
                 <td className="py-2 px-4 text-right">{item.quantity}</td>
@@ -90,15 +94,15 @@ const QuoteDocument: React.FC<QuoteDocumentProps> = ({ quote }) => {
           <tfoot className="border-t">
             <tr>
               <td colSpan={4} className="py-2 px-4 text-right font-medium">Subtotal</td>
-              <td className="py-2 px-4 text-right">R {quote.subtotal.toFixed(2)}</td>
+              <td className="py-2 px-4 text-right">R {quote.subtotal?.toFixed(2)}</td>
             </tr>
             <tr>
               <td colSpan={4} className="py-2 px-4 text-right font-medium">VAT</td>
-              <td className="py-2 px-4 text-right">R {quote.taxTotal.toFixed(2)}</td>
+              <td className="py-2 px-4 text-right">R {quote.taxTotal?.toFixed(2)}</td>
             </tr>
             <tr className="bg-gray-100">
               <td colSpan={4} className="py-2 px-4 text-right font-bold">Total</td>
-              <td className="py-2 px-4 text-right font-bold">R {quote.total.toFixed(2)}</td>
+              <td className="py-2 px-4 text-right font-bold">R {quote.total?.toFixed(2)}</td>
             </tr>
           </tfoot>
         </table>

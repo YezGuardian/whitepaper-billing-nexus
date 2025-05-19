@@ -5,22 +5,26 @@ import MainLayout from '@/layouts/MainLayout';
 import SettingsForm from '@/components/SettingsForm';
 import { CompanySettings } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings as SettingsIcon, Loader } from 'lucide-react';
+import { Settings as SettingsIcon, Loader, AlertTriangle } from 'lucide-react';
 import { getCompanySettings, updateCompanySettings } from '@/services/supabaseService';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const SettingsPage = () => {
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         setIsLoading(true);
+        setError(null);
         const settings = await getCompanySettings();
         setCompanySettings(settings);
       } catch (error) {
         console.error('Error fetching company settings:', error);
+        setError('Failed to load company settings. Please try again.');
         toast({
           title: 'Failed to load settings',
           description: 'There was an error loading your company settings.',
@@ -36,6 +40,7 @@ const SettingsPage = () => {
 
   const handleSaveSettings = async (settings: CompanySettings) => {
     try {
+      setError(null);
       await updateCompanySettings(settings);
       setCompanySettings(settings);
       toast({
@@ -44,6 +49,7 @@ const SettingsPage = () => {
       });
     } catch (error) {
       console.error('Error saving company settings:', error);
+      setError('Failed to save settings. Please check your input and try again.');
       toast({
         title: 'Failed to save settings',
         description: 'There was an error saving your company settings.',
@@ -68,6 +74,14 @@ const SettingsPage = () => {
         <SettingsIcon className="h-6 w-6 mr-2" />
         <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
       </div>
+
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <Card>
         <CardHeader>
