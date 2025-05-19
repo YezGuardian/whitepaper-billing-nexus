@@ -394,12 +394,12 @@ export const saveQuote = async (quote: Quote): Promise<Quote> => {
     // Save the quote items
     const itemsData = quote.items.map(item => ({
       id: item.id || uuidv4(),
-      invoice_id: quoteId,
+      invoice_id: quoteId,  // This is the key field that needs to be correct
       description: item.description,
       quantity: item.quantity,
       unit_price: item.unitPrice,
       tax_rate: item.taxRate,
-      amount: item.total
+      amount: item.quantity * item.unitPrice * (1 + item.taxRate / 100)
     }));
     
     const { error: itemsError } = await supabase

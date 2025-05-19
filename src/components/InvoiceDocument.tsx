@@ -2,13 +2,34 @@
 import { format } from 'date-fns';
 import { Invoice } from '@/types';
 import Logo from './Logo';
-import { companySettings } from '@/data/mockData';
+import { useState, useEffect } from 'react';
+import { CompanySettings } from '@/types';
+import { getCompanySettings } from '@/services/supabaseService';
 
 interface InvoiceDocumentProps {
   invoice: Invoice;
 }
 
 const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({ invoice }) => {
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
+  
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const settings = await getCompanySettings();
+        setCompanySettings(settings);
+      } catch (error) {
+        console.error('Error fetching company settings:', error);
+      }
+    };
+    
+    fetchSettings();
+  }, []);
+  
+  if (!companySettings) {
+    return <div className="p-8">Loading company information...</div>;
+  }
+
   return (
     <div className="pdf-content bg-white p-8 shadow-lg rounded-lg">
       <div className="flex justify-between items-start">

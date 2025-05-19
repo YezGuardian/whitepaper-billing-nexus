@@ -2,14 +2,36 @@
 import { format } from 'date-fns';
 import { Quote } from '@/types';
 import Logo from './Logo';
+import { getCompanySettings } from '@/services/supabaseService';
+import { useState, useEffect } from 'react';
+import { CompanySettings } from '@/types';
 
 interface QuoteDocumentProps {
   quote: Quote;
 }
 
 const QuoteDocument: React.FC<QuoteDocumentProps> = ({ quote }) => {
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
+  
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const settings = await getCompanySettings();
+        setCompanySettings(settings);
+      } catch (error) {
+        console.error('Error fetching company settings:', error);
+      }
+    };
+    
+    fetchSettings();
+  }, []);
+
   if (!quote) {
     return <div className="p-8">Loading quote data...</div>;
+  }
+  
+  if (!companySettings) {
+    return <div className="p-8">Loading company information...</div>;
   }
 
   return (
@@ -24,12 +46,12 @@ const QuoteDocument: React.FC<QuoteDocumentProps> = ({ quote }) => {
             />
           </div>
           <div className="mt-4">
-            <div className="font-bold">White Paper Systems</div>
-            <div className="text-sm text-gray-500 whitespace-pre-line">123 Business Street\nPretoria\nSouth Africa</div>
-            <div className="text-sm text-gray-500">+27 12 345 6789</div>
-            <div className="text-sm text-gray-500">info@whitepapersystems.com</div>
-            <div className="text-sm text-gray-500">www.whitepapersystems.com</div>
-            <div className="text-sm text-gray-500">VAT: ZA123456789</div>
+            <div className="font-bold">{companySettings.name}</div>
+            <div className="text-sm text-gray-500 whitespace-pre-line">{companySettings.address}</div>
+            <div className="text-sm text-gray-500">{companySettings.phone}</div>
+            <div className="text-sm text-gray-500">{companySettings.email}</div>
+            <div className="text-sm text-gray-500">{companySettings.website}</div>
+            <div className="text-sm text-gray-500">VAT: {companySettings.vatNumber}</div>
           </div>
         </div>
         <div className="text-right">
@@ -127,7 +149,7 @@ const QuoteDocument: React.FC<QuoteDocumentProps> = ({ quote }) => {
 
       <div className="mt-8">
         <p className="text-sm text-gray-500">
-          To accept this quotation, please sign below and return to info@whitepapersystems.com or contact us at +27 12 345 6789.
+          To accept this quotation, please sign below and return to {companySettings.email} or contact us at {companySettings.phone}.
         </p>
       </div>
 
@@ -139,7 +161,7 @@ const QuoteDocument: React.FC<QuoteDocumentProps> = ({ quote }) => {
             <div className="mt-2 text-sm text-gray-500">Signature & Date</div>
           </div>
           <div>
-            <div className="text-sm font-medium">For White Paper Systems:</div>
+            <div className="text-sm font-medium">For {companySettings.name}:</div>
             <div className="mt-2">
               <img 
                 src="/lovable-uploads/904b88b4-0095-4691-a6d5-af01f553ac8e.png" 
