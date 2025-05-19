@@ -531,7 +531,7 @@ export const getInvoices = async (): Promise<Invoice[]> => {
         taxTotal,
         total: Number(invoice.total_amount),
         status: invoice.status as any,
-        recurrence: invoice.recurrence || 'none',
+        recurrence: (invoice.recurrence as "none" | "weekly" | "monthly" | "quarterly" | "yearly") || "none",
         nextGenerationDate: invoice.next_generation_date ? new Date(invoice.next_generation_date) : undefined
       });
     }
