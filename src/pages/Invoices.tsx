@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useReactToPdf } from '@/hooks/use-pdf';
@@ -7,9 +7,10 @@ import MainLayout from '@/layouts/MainLayout';
 import { DataTable } from '@/components/DataTable';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Invoice } from '@/types';
 import StatusBadge from '@/components/StatusBadge';
-import { Edit, Eye, FileText, Download, Plus, Trash2, Loader } from 'lucide-react';
+import { Edit, Eye, FileText, Download, Plus, Trash2, Loader, User, Calendar, Clock, Repeat } from 'lucide-react';
 import InvoiceForm from '@/components/InvoiceForm';
 import InvoiceDocument from '@/components/InvoiceDocument';
 import { 
@@ -29,6 +30,7 @@ const InvoicesPage = () => {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('all');
   const { toast } = useToast();
 
   // PDF generation setup - ensure targetRef is passed to InvoiceDocument
@@ -157,6 +159,73 @@ const InvoicesPage = () => {
     setIsFormOpen(true);
   };
 
+  // Filter invoices based on active tab
+  const filteredInvoices = useMemo(() => {
+    if (activeTab === 'all') return invoices;
+    
+    if (activeTab.startsWith('client-')) {
+      const clientId = activeTab.replace('client-', '');
+      return invoices.filter(invoice => invoice.client.id === clientId);
+    }
+    
+    if (activeTab.startsWith('recurrence-')) {
+      const recurrence = activeTab.replace('recurrence-', '');
+      return invoices.filter(invoice => invoice.recurrence === recurrence);
+    }
+
+    if (activeTab.startsWith('due-')) {
+      const duePeriod = activeTab.replace('due-', '');
+      const today = new Date();
+      
+      switch (duePeriod) {
+        case 'overdue':
+          return invoices.filter(invoice => 
+            new Date(invoice.dueDate) < today && invoice.status !== 'paid');
+        case 'this-week': {
+          const endOfWeek = new Date(today);
+          endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
+          return invoices.filter(invoice => 
+            new Date(invoice.dueDate) >= today && 
+            new Date(invoice.dueDate) <= endOfWeek);
+        }
+        case 'this-month': {
+          const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+          return invoices.filter(invoice => 
+            new Date(invoice.dueDate) >= today && 
+            new Date(invoice.dueDate) <= endOfMonth);
+        }
+        default:
+          return invoices;
+      }
+    }
+
+    // Filter by status
+    return invoices.filter(invoice => invoice.status === activeTab);
+  }, [activeTab, invoices]);
+
+  // Generate unique client list for tabs
+  const clientTabs = useMemo(() => {
+    const uniqueClients = Array.from(new Set(invoices.map(invoice => invoice.client.id)))
+      .map(clientId => {
+        const invoice = invoices.find(inv => inv.client.id === clientId);
+        return {
+          id: clientId,
+          name: invoice?.client.name || 'Unknown Client'
+        };
+      });
+    return uniqueClients;
+  }, [invoices]);
+
+  // Generate unique recurrence options for tabs
+  const recurrenceTabs = useMemo(() => {
+    const recurrenceTypes = Array.from(new Set(
+      invoices
+        .filter(invoice => invoice.recurrence && invoice.recurrence !== 'none')
+        .map(invoice => invoice.recurrence)
+    ));
+    return recurrenceTypes;
+  }, [invoices]);
+
   // Table columns configuration
   const columns = [
     {
@@ -260,7 +329,84 @@ const InvoicesPage = () => {
         </Button>
       </div>
 
-      <DataTable columns={columns} data={invoices} searchField="invoiceNumber" />
+      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <div className="mb-4">
+          <h2 className="text-sm font-medium text-gray-500 mb-2">View All</h2>
+          <TabsList className="mb-2 w-full md:w-auto">
+            <TabsTrigger value="all">All Invoices</TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Status tabs */}
+        <div className="mb-4">
+          <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
+            <Clock className="h-4 w-4 mr-1" />
+            By Status
+          </h2>
+          <TabsList className="mb-2 w-full overflow-x-auto">
+            <TabsTrigger value="draft">Draft</TabsTrigger>
+            <TabsTrigger value="sent">Sent</TabsTrigger>
+            <TabsTrigger value="paid">Paid</TabsTrigger>
+            <TabsTrigger value="overdue">Overdue</TabsTrigger>
+            <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Client tabs */}
+        {clientTabs.length > 0 && (
+          <div className="mb-4">
+            <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
+              <User className="h-4 w-4 mr-1" />
+              By Client
+            </h2>
+            <TabsList className="mb-2 w-full overflow-x-auto">
+              {clientTabs.map((client) => (
+                <TabsTrigger key={client.id} value={`client-${client.id}`}>
+                  {client.name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+        )}
+
+        {/* Recurrence tabs */}
+        {recurrenceTabs.length > 0 && (
+          <div className="mb-4">
+            <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
+              <Repeat className="h-4 w-4 mr-1" />
+              By Recurrence
+            </h2>
+            <TabsList className="mb-2 w-full overflow-x-auto">
+              {recurrenceTabs.map((recurrence) => (
+                <TabsTrigger key={recurrence} value={`recurrence-${recurrence}`}>
+                  {recurrence.charAt(0).toUpperCase() + recurrence.slice(1)}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+        )}
+
+        {/* Due Date tabs */}
+        <div className="mb-4">
+          <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
+            <Calendar className="h-4 w-4 mr-1" />
+            By Due Date
+          </h2>
+          <TabsList className="mb-2 w-full overflow-x-auto">
+            <TabsTrigger value="due-overdue">Overdue</TabsTrigger>
+            <TabsTrigger value="due-this-week">Due This Week</TabsTrigger>
+            <TabsTrigger value="due-this-month">Due This Month</TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value={activeTab} className="mt-6">
+          <DataTable 
+            columns={columns} 
+            data={filteredInvoices} 
+            searchField="invoiceNumber" 
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Invoice Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
