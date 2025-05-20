@@ -331,7 +331,6 @@ export const getQuotes = async (): Promise<Quote[]> => {
       });
     }
     
-    console.log("Fetched quotes:", quotes);
     return quotes;
   } catch (error) {
     console.error('Error in getQuotes:', error);
@@ -341,8 +340,6 @@ export const getQuotes = async (): Promise<Quote[]> => {
 
 export const saveQuote = async (quote: Quote): Promise<Quote> => {
   try {
-    console.log("saveQuote received:", quote);
-    
     // Determine if this is a new quote or an update
     const isNewQuote = !quote.id;
     const quoteId = isNewQuote ? uuidv4() : quote.id;
@@ -360,34 +357,26 @@ export const saveQuote = async (quote: Quote): Promise<Quote> => {
       status: quote.status
     };
     
-    console.log("Saving quote with data:", quoteData);
-    
     // Save the quote
     if (isNewQuote) {
-      const { data, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from('quotes')
-        .insert([quoteData])
-        .select();
+        .insert([quoteData]);
       
       if (insertError) {
         console.error('Error creating quote:', insertError);
         throw insertError;
       }
-      
-      console.log("New quote inserted:", data);
     } else {
-      const { data, error: updateError } = await supabase
+      const { error: updateError } = await supabase
         .from('quotes')
         .update(quoteData)
-        .eq('id', quoteId)
-        .select();
+        .eq('id', quoteId);
       
       if (updateError) {
         console.error('Error updating quote:', updateError);
         throw updateError;
       }
-      
-      console.log("Quote updated:", data);
       
       // Delete existing items for this quote to recreate them
       const { error: deleteError } = await supabase
@@ -399,53 +388,40 @@ export const saveQuote = async (quote: Quote): Promise<Quote> => {
         console.error('Error deleting quote items:', deleteError);
         throw deleteError;
       }
-      
-      console.log("Old quote items deleted successfully");
     }
 
-    console.log('Quote saved successfully, now saving items for quoteId:', quoteId);
+    console.log('Quote saved successfully, now saving items...');
     
     // Save the quote items one by one to avoid batch issues
     for (const item of quote.items) {
-      const itemId = item.id || uuidv4();
-      const itemTotal = item.total || (item.quantity * item.unitPrice * (1 + item.taxRate / 100));
-      
       const itemData = {
-        id: itemId,
+        id: item.id || uuidv4(),
         invoice_id: quoteId,
         description: item.description,
         quantity: item.quantity,
         unit_price: item.unitPrice,
         tax_rate: item.taxRate,
-        amount: itemTotal
+        amount: item.total || (item.quantity * item.unitPrice * (1 + item.taxRate / 100))
       };
       
-      console.log("Inserting item with data:", itemData);
-      
       // Insert each item individually
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('invoice_items')
-        .insert([itemData])
-        .select();
+        .insert([itemData]);
       
       if (error) {
         console.error('Error saving quote item:', error);
         throw error;
       }
-      
-      console.log("Item inserted:", data);
     }
     
     console.log('All quote items saved successfully');
     
     // Return the saved quote with updated ID
-    const savedQuote = {
+    return {
       ...quote,
       id: quoteId
     };
-    
-    console.log("Returning saved quote:", savedQuote);
-    return savedQuote;
   } catch (error) {
     console.error('Error in saveQuote:', error);
     throw error;
