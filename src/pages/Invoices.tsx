@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Invoice } from '@/types';
-import StatusBadge from '@/components/StatusBadge';
 import { Edit, Eye, FileText, Download, Plus, Trash2, Loader, User, Calendar, Clock, Repeat } from 'lucide-react';
 import InvoiceForm from '@/components/InvoiceForm';
 import InvoiceDocument from '@/components/InvoiceDocument';
@@ -20,6 +19,8 @@ import {
   deleteInvoice, 
   getCompanySettings 
 } from '@/services/supabaseService';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const InvoicesPage = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -33,7 +34,7 @@ const InvoicesPage = () => {
   const [activeTab, setActiveTab] = useState('all');
   const { toast } = useToast();
 
-  // PDF generation setup - ensure targetRef is passed to InvoiceDocument
+  // PDF generation setup
   const { toPDF, targetRef, loading } = useReactToPdf({
     filename: selectedInvoice ? `invoice-${selectedInvoice.invoiceNumber}.pdf` : 'invoice.pdf',
   });
@@ -132,7 +133,7 @@ const InvoicesPage = () => {
     setIsViewOpen(true);
   };
 
-  // Handle download PDF using our updated approach
+  // Handle download PDF
   const handleDownload = async () => {
     try {
       const url = await toPDF();
@@ -263,14 +264,42 @@ const InvoicesPage = () => {
       accessorKey: 'status',
       header: 'Status',
       cell: ({ row }: { row: any }) => {
-        return <StatusBadge status={row.original.status} />;
+        const status = row.original.status;
+        let statusColor = 'bg-gray-200 text-gray-800'; // Default
+        
+        switch (status) {
+          case 'draft':
+            statusColor = 'bg-gray-200 text-gray-800';
+            break;
+          case 'sent':
+            statusColor = 'bg-blue-100 text-blue-800';
+            break;
+          case 'paid':
+            statusColor = 'bg-green-100 text-green-800';
+            break;
+          case 'overdue':
+            statusColor = 'bg-red-100 text-red-800';
+            break;
+          case 'cancelled':
+            statusColor = 'bg-yellow-100 text-yellow-800';
+            break;
+        }
+        
+        return (
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </span>
+        );
       },
     },
     {
       accessorKey: 'recurrence',
       header: 'Recurrence',
       cell: ({ row }: { row: any }) => {
-        return row.original.recurrence === 'none' ? '-' : row.original.recurrence;
+        const recurrence = row.original.recurrence;
+        return recurrence === 'none' ? '-' : (
+          recurrence.charAt(0).toUpperCase() + recurrence.slice(1)
+        );
       },
     },
     {
@@ -329,84 +358,107 @@ const InvoicesPage = () => {
         </Button>
       </div>
 
-      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <div className="mb-4">
-          <h2 className="text-sm font-medium text-gray-500 mb-2">View All</h2>
-          <TabsList className="mb-2 w-full md:w-auto">
-            <TabsTrigger value="all">All Invoices</TabsTrigger>
-          </TabsList>
-        </div>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Filter Invoices</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
+              {/* Main tabs section with better organization */}
+              <div className="grid gap-4">
+                {/* View All tab */}
+                <div>
+                  <h2 className="text-sm font-medium text-gray-500 mb-2">View All</h2>
+                  <TabsList className="w-full justify-start">
+                    <TabsTrigger value="all" className="flex-shrink-0">All Invoices</TabsTrigger>
+                  </TabsList>
+                </div>
+                
+                {/* Status tabs */}
+                <div>
+                  <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
+                    <Clock className="h-4 w-4 mr-1" />
+                    By Status
+                  </h2>
+                  <ScrollArea className="w-full">
+                    <TabsList className="w-max pr-4">
+                      <TabsTrigger value="draft" className="flex-shrink-0">Draft</TabsTrigger>
+                      <TabsTrigger value="sent" className="flex-shrink-0">Sent</TabsTrigger>
+                      <TabsTrigger value="paid" className="flex-shrink-0">Paid</TabsTrigger>
+                      <TabsTrigger value="overdue" className="flex-shrink-0">Overdue</TabsTrigger>
+                      <TabsTrigger value="cancelled" className="flex-shrink-0">Cancelled</TabsTrigger>
+                    </TabsList>
+                  </ScrollArea>
+                </div>
+                
+                {/* Client tabs */}
+                {clientTabs.length > 0 && (
+                  <div>
+                    <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
+                      <User className="h-4 w-4 mr-1" />
+                      By Client
+                    </h2>
+                    <ScrollArea className="w-full">
+                      <TabsList className="w-max pr-4">
+                        {clientTabs.map((client) => (
+                          <TabsTrigger key={client.id} value={`client-${client.id}`} className="flex-shrink-0">
+                            {client.name}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                    </ScrollArea>
+                  </div>
+                )}
 
-        {/* Status tabs */}
-        <div className="mb-4">
-          <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
-            <Clock className="h-4 w-4 mr-1" />
-            By Status
-          </h2>
-          <TabsList className="mb-2 w-full overflow-x-auto">
-            <TabsTrigger value="draft">Draft</TabsTrigger>
-            <TabsTrigger value="sent">Sent</TabsTrigger>
-            <TabsTrigger value="paid">Paid</TabsTrigger>
-            <TabsTrigger value="overdue">Overdue</TabsTrigger>
-            <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
-          </TabsList>
-        </div>
+                {/* Recurrence tabs */}
+                {recurrenceTabs.length > 0 && (
+                  <div>
+                    <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
+                      <Repeat className="h-4 w-4 mr-1" />
+                      By Recurrence
+                    </h2>
+                    <ScrollArea className="w-full">
+                      <TabsList className="w-max pr-4">
+                        {recurrenceTabs.map((recurrence) => (
+                          <TabsTrigger key={recurrence} value={`recurrence-${recurrence}`} className="flex-shrink-0">
+                            {recurrence.charAt(0).toUpperCase() + recurrence.slice(1)}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                    </ScrollArea>
+                  </div>
+                )}
 
-        {/* Client tabs */}
-        {clientTabs.length > 0 && (
-          <div className="mb-4">
-            <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
-              <User className="h-4 w-4 mr-1" />
-              By Client
-            </h2>
-            <TabsList className="mb-2 w-full overflow-x-auto">
-              {clientTabs.map((client) => (
-                <TabsTrigger key={client.id} value={`client-${client.id}`}>
-                  {client.name}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-        )}
+                {/* Due Date tabs */}
+                <div>
+                  <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
+                    <Calendar className="h-4 w-4 mr-1" />
+                    By Due Date
+                  </h2>
+                  <ScrollArea className="w-full">
+                    <TabsList className="w-max pr-4">
+                      <TabsTrigger value="due-overdue" className="flex-shrink-0">Overdue</TabsTrigger>
+                      <TabsTrigger value="due-this-week" className="flex-shrink-0">Due This Week</TabsTrigger>
+                      <TabsTrigger value="due-this-month" className="flex-shrink-0">Due This Month</TabsTrigger>
+                    </TabsList>
+                  </ScrollArea>
+                </div>
+              </div>
+            </Tabs>
+          </CardContent>
+        </Card>
 
-        {/* Recurrence tabs */}
-        {recurrenceTabs.length > 0 && (
-          <div className="mb-4">
-            <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
-              <Repeat className="h-4 w-4 mr-1" />
-              By Recurrence
-            </h2>
-            <TabsList className="mb-2 w-full overflow-x-auto">
-              {recurrenceTabs.map((recurrence) => (
-                <TabsTrigger key={recurrence} value={`recurrence-${recurrence}`}>
-                  {recurrence.charAt(0).toUpperCase() + recurrence.slice(1)}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-        )}
-
-        {/* Due Date tabs */}
-        <div className="mb-4">
-          <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
-            <Calendar className="h-4 w-4 mr-1" />
-            By Due Date
-          </h2>
-          <TabsList className="mb-2 w-full overflow-x-auto">
-            <TabsTrigger value="due-overdue">Overdue</TabsTrigger>
-            <TabsTrigger value="due-this-week">Due This Week</TabsTrigger>
-            <TabsTrigger value="due-this-month">Due This Month</TabsTrigger>
-          </TabsList>
-        </div>
-
-        <TabsContent value={activeTab} className="mt-6">
-          <DataTable 
-            columns={columns} 
-            data={filteredInvoices} 
-            searchField="invoiceNumber" 
-          />
-        </TabsContent>
-      </Tabs>
+        <Card>
+          <CardContent className="pt-6">
+            <DataTable 
+              columns={columns} 
+              data={filteredInvoices} 
+              searchField="invoiceNumber" 
+            />
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Invoice Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
