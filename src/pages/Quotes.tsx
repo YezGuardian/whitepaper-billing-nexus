@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +36,22 @@ const QuotesPage = () => {
     filename: selectedQuote ? `quote-${selectedQuote.quoteNumber}.pdf` : 'quote.pdf',
   });
 
+  const fetchQuotes = async () => {
+    try {
+      const quotesData = await getQuotes();
+      setQuotes(quotesData);
+      return quotesData;
+    } catch (error) {
+      console.error('Error fetching quotes:', error);
+      toast({
+        title: 'Failed to load quotes',
+        description: 'There was an error loading quotes data. Please try again.',
+        variant: 'destructive',
+      });
+      return [];
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -47,8 +64,7 @@ const QuotesPage = () => {
         const settings = await getCompanySettings();
         setCompanySettings(settings);
         
-        const quotesData = await getQuotes();
-        setQuotes(quotesData);
+        await fetchQuotes();
       } catch (error) {
         console.error('Error fetching data:', error);
         toast({
@@ -70,21 +86,15 @@ const QuotesPage = () => {
       console.log("Attempting to save quote:", quote);
       const savedQuote = await saveQuote(quote);
       
-      if (quotes.some(q => q.id === quote.id)) {
-        // Update existing quote
-        setQuotes(quotes.map(q => (q.id === quote.id ? savedQuote : q)));
-        toast({
-          title: 'Quote updated',
-          description: `Quote ${quote.quoteNumber} has been updated.`,
-        });
-      } else {
-        // Add new quote
-        setQuotes([...quotes, savedQuote]);
-        toast({
-          title: 'Quote created',
-          description: `Quote ${quote.quoteNumber} has been created.`,
-        });
-      }
+      // Refresh quotes from the database to ensure we have the latest data
+      const updatedQuotes = await fetchQuotes();
+      
+      toast({
+        title: quotes.some(q => q.id === quote.id) ? 'Quote updated' : 'Quote created',
+        description: `Quote ${quote.quoteNumber} has been ${quotes.some(q => q.id === quote.id) ? 'updated' : 'created'}.`,
+      });
+      
+      // Make sure to close the form after successful save
       setIsFormOpen(false);
     } catch (error) {
       console.error('Error saving quote:', error);
@@ -102,7 +112,9 @@ const QuotesPage = () => {
     
     try {
       await deleteQuote(selectedQuote.id);
-      setQuotes(quotes.filter(q => q.id !== selectedQuote.id));
+      // Refresh quotes from the database
+      await fetchQuotes();
+      
       toast({
         title: 'Quote deleted',
         description: `Quote ${selectedQuote.quoteNumber} has been deleted.`,
