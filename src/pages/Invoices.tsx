@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useReactToPdf } from '@/hooks/use-pdf';
@@ -7,9 +7,9 @@ import MainLayout from '@/layouts/MainLayout';
 import { DataTable } from '@/components/DataTable';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Invoice } from '@/types';
-import { Edit, Eye, FileText, Download, Plus, Trash2, Loader, User, Calendar, Clock, Repeat } from 'lucide-react';
+import StatusBadge from '@/components/StatusBadge';
+import { Edit, Eye, FileText, Download, Plus, Trash2, Loader } from 'lucide-react';
 import InvoiceForm from '@/components/InvoiceForm';
 import InvoiceDocument from '@/components/InvoiceDocument';
 import { 
@@ -19,8 +19,6 @@ import {
   deleteInvoice, 
   getCompanySettings 
 } from '@/services/supabaseService';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 const InvoicesPage = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -31,10 +29,9 @@ const InvoicesPage = () => {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('all');
   const { toast } = useToast();
 
-  // PDF generation setup
+  // PDF generation setup - ensure targetRef is passed to InvoiceDocument
   const { toPDF, targetRef, loading } = useReactToPdf({
     filename: selectedInvoice ? `invoice-${selectedInvoice.invoiceNumber}.pdf` : 'invoice.pdf',
   });
@@ -133,7 +130,7 @@ const InvoicesPage = () => {
     setIsViewOpen(true);
   };
 
-  // Handle download PDF
+  // Handle download PDF using our updated approach
   const handleDownload = async () => {
     try {
       const url = await toPDF();
@@ -159,73 +156,6 @@ const InvoicesPage = () => {
     setSelectedInvoice(null);
     setIsFormOpen(true);
   };
-
-  // Filter invoices based on active tab
-  const filteredInvoices = useMemo(() => {
-    if (activeTab === 'all') return invoices;
-    
-    if (activeTab.startsWith('client-')) {
-      const clientId = activeTab.replace('client-', '');
-      return invoices.filter(invoice => invoice.client.id === clientId);
-    }
-    
-    if (activeTab.startsWith('recurrence-')) {
-      const recurrence = activeTab.replace('recurrence-', '');
-      return invoices.filter(invoice => invoice.recurrence === recurrence);
-    }
-
-    if (activeTab.startsWith('due-')) {
-      const duePeriod = activeTab.replace('due-', '');
-      const today = new Date();
-      
-      switch (duePeriod) {
-        case 'overdue':
-          return invoices.filter(invoice => 
-            new Date(invoice.dueDate) < today && invoice.status !== 'paid');
-        case 'this-week': {
-          const endOfWeek = new Date(today);
-          endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
-          return invoices.filter(invoice => 
-            new Date(invoice.dueDate) >= today && 
-            new Date(invoice.dueDate) <= endOfWeek);
-        }
-        case 'this-month': {
-          const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-          return invoices.filter(invoice => 
-            new Date(invoice.dueDate) >= today && 
-            new Date(invoice.dueDate) <= endOfMonth);
-        }
-        default:
-          return invoices;
-      }
-    }
-
-    // Filter by status
-    return invoices.filter(invoice => invoice.status === activeTab);
-  }, [activeTab, invoices]);
-
-  // Generate unique client list for tabs
-  const clientTabs = useMemo(() => {
-    const uniqueClients = Array.from(new Set(invoices.map(invoice => invoice.client.id)))
-      .map(clientId => {
-        const invoice = invoices.find(inv => inv.client.id === clientId);
-        return {
-          id: clientId,
-          name: invoice?.client.name || 'Unknown Client'
-        };
-      });
-    return uniqueClients;
-  }, [invoices]);
-
-  // Generate unique recurrence options for tabs
-  const recurrenceTabs = useMemo(() => {
-    const recurrenceTypes = Array.from(new Set(
-      invoices
-        .filter(invoice => invoice.recurrence && invoice.recurrence !== 'none')
-        .map(invoice => invoice.recurrence)
-    ));
-    return recurrenceTypes;
-  }, [invoices]);
 
   // Table columns configuration
   const columns = [
@@ -264,42 +194,14 @@ const InvoicesPage = () => {
       accessorKey: 'status',
       header: 'Status',
       cell: ({ row }: { row: any }) => {
-        const status = row.original.status;
-        let statusColor = 'bg-gray-200 text-gray-800'; // Default
-        
-        switch (status) {
-          case 'draft':
-            statusColor = 'bg-gray-200 text-gray-800';
-            break;
-          case 'sent':
-            statusColor = 'bg-blue-100 text-blue-800';
-            break;
-          case 'paid':
-            statusColor = 'bg-green-100 text-green-800';
-            break;
-          case 'overdue':
-            statusColor = 'bg-red-100 text-red-800';
-            break;
-          case 'cancelled':
-            statusColor = 'bg-yellow-100 text-yellow-800';
-            break;
-        }
-        
-        return (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>
-            {status.charAt(0).toUpperCase() + status.slice(1)}
-          </span>
-        );
+        return <StatusBadge status={row.original.status} />;
       },
     },
     {
       accessorKey: 'recurrence',
       header: 'Recurrence',
       cell: ({ row }: { row: any }) => {
-        const recurrence = row.original.recurrence;
-        return recurrence === 'none' ? '-' : (
-          recurrence.charAt(0).toUpperCase() + recurrence.slice(1)
-        );
+        return row.original.recurrence === 'none' ? '-' : row.original.recurrence;
       },
     },
     {
@@ -358,107 +260,7 @@ const InvoicesPage = () => {
         </Button>
       </div>
 
-      <div className="space-y-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Filter Invoices</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
-              {/* Main tabs section with better organization */}
-              <div className="grid gap-4">
-                {/* View All tab */}
-                <div>
-                  <h2 className="text-sm font-medium text-gray-500 mb-2">View All</h2>
-                  <TabsList className="w-full justify-start">
-                    <TabsTrigger value="all" className="flex-shrink-0">All Invoices</TabsTrigger>
-                  </TabsList>
-                </div>
-                
-                {/* Status tabs */}
-                <div>
-                  <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
-                    <Clock className="h-4 w-4 mr-1" />
-                    By Status
-                  </h2>
-                  <ScrollArea className="w-full">
-                    <TabsList className="w-max pr-4">
-                      <TabsTrigger value="draft" className="flex-shrink-0">Draft</TabsTrigger>
-                      <TabsTrigger value="sent" className="flex-shrink-0">Sent</TabsTrigger>
-                      <TabsTrigger value="paid" className="flex-shrink-0">Paid</TabsTrigger>
-                      <TabsTrigger value="overdue" className="flex-shrink-0">Overdue</TabsTrigger>
-                      <TabsTrigger value="cancelled" className="flex-shrink-0">Cancelled</TabsTrigger>
-                    </TabsList>
-                  </ScrollArea>
-                </div>
-                
-                {/* Client tabs */}
-                {clientTabs.length > 0 && (
-                  <div>
-                    <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
-                      <User className="h-4 w-4 mr-1" />
-                      By Client
-                    </h2>
-                    <ScrollArea className="w-full">
-                      <TabsList className="w-max pr-4">
-                        {clientTabs.map((client) => (
-                          <TabsTrigger key={client.id} value={`client-${client.id}`} className="flex-shrink-0">
-                            {client.name}
-                          </TabsTrigger>
-                        ))}
-                      </TabsList>
-                    </ScrollArea>
-                  </div>
-                )}
-
-                {/* Recurrence tabs */}
-                {recurrenceTabs.length > 0 && (
-                  <div>
-                    <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
-                      <Repeat className="h-4 w-4 mr-1" />
-                      By Recurrence
-                    </h2>
-                    <ScrollArea className="w-full">
-                      <TabsList className="w-max pr-4">
-                        {recurrenceTabs.map((recurrence) => (
-                          <TabsTrigger key={recurrence} value={`recurrence-${recurrence}`} className="flex-shrink-0">
-                            {recurrence.charAt(0).toUpperCase() + recurrence.slice(1)}
-                          </TabsTrigger>
-                        ))}
-                      </TabsList>
-                    </ScrollArea>
-                  </div>
-                )}
-
-                {/* Due Date tabs */}
-                <div>
-                  <h2 className="flex items-center text-sm font-medium text-gray-500 mb-2">
-                    <Calendar className="h-4 w-4 mr-1" />
-                    By Due Date
-                  </h2>
-                  <ScrollArea className="w-full">
-                    <TabsList className="w-max pr-4">
-                      <TabsTrigger value="due-overdue" className="flex-shrink-0">Overdue</TabsTrigger>
-                      <TabsTrigger value="due-this-week" className="flex-shrink-0">Due This Week</TabsTrigger>
-                      <TabsTrigger value="due-this-month" className="flex-shrink-0">Due This Month</TabsTrigger>
-                    </TabsList>
-                  </ScrollArea>
-                </div>
-              </div>
-            </Tabs>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <DataTable 
-              columns={columns} 
-              data={filteredInvoices} 
-              searchField="invoiceNumber" 
-            />
-          </CardContent>
-        </Card>
-      </div>
+      <DataTable columns={columns} data={invoices} searchField="invoiceNumber" />
 
       {/* Invoice Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
