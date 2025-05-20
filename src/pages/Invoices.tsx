@@ -67,23 +67,21 @@ const InvoicesPage = () => {
   // Handle form submission
   const handleSaveInvoice = async (invoice: Invoice) => {
     try {
-      const savedInvoice = await saveInvoice(invoice);
+      console.log("Attempting to save invoice:", JSON.stringify(invoice, null, 2));
       
-      if (invoices.some(inv => inv.id === invoice.id)) {
-        // Update existing invoice
-        setInvoices(invoices.map(inv => (inv.id === invoice.id ? savedInvoice : inv)));
-        toast({
-          title: 'Invoice updated',
-          description: `Invoice ${invoice.invoiceNumber} has been updated.`,
-        });
-      } else {
-        // Add new invoice
-        setInvoices([...invoices, savedInvoice]);
-        toast({
-          title: 'Invoice created',
-          description: `Invoice ${invoice.invoiceNumber} has been created.`,
-        });
-      }
+      const savedInvoice = await saveInvoice(invoice);
+      console.log("Response from saveInvoice:", savedInvoice);
+      
+      // Refresh the list of invoices to ensure we have the latest data
+      const updatedInvoices = await getInvoices();
+      setInvoices(updatedInvoices);
+      
+      toast({
+        title: invoice.id ? 'Invoice updated' : 'Invoice created',
+        description: `Invoice ${invoice.invoiceNumber} has been ${invoice.id ? 'updated' : 'created'}.`,
+      });
+      
+      // Close the form after successful save
       setIsFormOpen(false);
     } catch (error) {
       console.error('Error saving invoice:', error);
@@ -101,7 +99,11 @@ const InvoicesPage = () => {
     
     try {
       await deleteInvoice(selectedInvoice.id);
-      setInvoices(invoices.filter(inv => inv.id !== selectedInvoice.id));
+      
+      // Refresh the list to ensure we have the latest data
+      const updatedInvoices = await getInvoices();
+      setInvoices(updatedInvoices);
+      
       toast({
         title: 'Invoice deleted',
         description: `Invoice ${selectedInvoice.invoiceNumber} has been deleted.`,

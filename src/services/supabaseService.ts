@@ -554,9 +554,13 @@ export const getInvoices = async (): Promise<Invoice[]> => {
 
 export const saveInvoice = async (invoice: Invoice): Promise<Invoice> => {
   try {
+    console.log("saveInvoice function called with:", JSON.stringify(invoice));
+    
     // Determine if this is a new invoice or an update
     const isNewInvoice = !invoice.id;
     const invoiceId = isNewInvoice ? uuidv4() : invoice.id;
+    
+    console.log("Invoice ID:", invoiceId, "Is new invoice:", isNewInvoice);
     
     // Prepare the invoice data for database
     const invoiceData = {
@@ -574,26 +578,34 @@ export const saveInvoice = async (invoice: Invoice): Promise<Invoice> => {
         new Date(invoice.nextGenerationDate).toISOString().split('T')[0] : null
     };
     
+    console.log("Prepared invoice data:", invoiceData);
+    
     // Save the invoice
     if (isNewInvoice) {
-      const { error: insertError } = await supabase
+      const { data, error: insertError } = await supabase
         .from('invoices')
-        .insert([invoiceData]);
+        .insert([invoiceData])
+        .select();
       
       if (insertError) {
         console.error('Error creating invoice:', insertError);
         throw insertError;
       }
+      
+      console.log("Insert response:", data);
     } else {
-      const { error: updateError } = await supabase
+      const { data, error: updateError } = await supabase
         .from('invoices')
         .update(invoiceData)
-        .eq('id', invoiceId);
+        .eq('id', invoiceId)
+        .select();
       
       if (updateError) {
         console.error('Error updating invoice:', updateError);
         throw updateError;
       }
+      
+      console.log("Update response:", data);
       
       // Delete existing items for this invoice to recreate them
       const { error: deleteError } = await supabase
@@ -607,25 +619,38 @@ export const saveInvoice = async (invoice: Invoice): Promise<Invoice> => {
       }
     }
     
+    console.log("Saving invoice items...");
+    
     // Save the invoice items
-    const itemsData = invoice.items.map(item => ({
-      id: item.id || uuidv4(),
-      invoice_id: invoiceId,
-      description: item.description,
-      quantity: item.quantity,
-      unit_price: item.unitPrice,
-      tax_rate: item.taxRate,
-      amount: item.total
-    }));
-    
-    const { error: itemsError } = await supabase
-      .from('invoice_items')
-      .insert(itemsData);
-    
-    if (itemsError) {
-      console.error('Error saving invoice items:', itemsError);
-      throw itemsError;
+    for (const item of invoice.items) {
+      // Calculate the correct item total
+      const itemTotal = item.quantity * item.unitPrice;
+      const taxAmount = (itemTotal * item.taxRate) / 100;
+      const total = itemTotal + taxAmount;
+      
+      const itemData = {
+        id: item.id || uuidv4(),
+        invoice_id: invoiceId,
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        tax_rate: item.taxRate,
+        amount: total
+      };
+      
+      console.log("Saving item:", itemData);
+      
+      const { error: itemError } = await supabase
+        .from('invoice_items')
+        .insert([itemData]);
+      
+      if (itemError) {
+        console.error('Error saving invoice item:', itemError);
+        throw itemError;
+      }
     }
+    
+    console.log("All invoice items saved successfully");
     
     // Return the saved invoice with updated ID
     return {
