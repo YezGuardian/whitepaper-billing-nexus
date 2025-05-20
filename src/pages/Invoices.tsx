@@ -69,6 +69,25 @@ const InvoicesPage = () => {
     try {
       console.log("Attempting to save invoice:", JSON.stringify(invoice, null, 2));
       
+      // Ensure all required fields are present
+      if (!invoice.client || !invoice.client.id) {
+        throw new Error("Invalid client data");
+      }
+      
+      if (!invoice.items || invoice.items.length === 0) {
+        throw new Error("Invoice must have at least one item");
+      }
+      
+      // Verify dates are valid
+      if (!(invoice.issueDate instanceof Date) || isNaN(invoice.issueDate.getTime())) {
+        throw new Error("Invalid issue date");
+      }
+      
+      if (!(invoice.dueDate instanceof Date) || isNaN(invoice.dueDate.getTime())) {
+        throw new Error("Invalid due date");
+      }
+      
+      // Save the invoice to the database
       const savedInvoice = await saveInvoice(invoice);
       console.log("Response from saveInvoice:", savedInvoice);
       
@@ -87,7 +106,7 @@ const InvoicesPage = () => {
       console.error('Error saving invoice:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save invoice. Please try again.',
+        description: `Failed to save invoice: ${error.message || 'Unknown error'}`,
         variant: 'destructive',
       });
     }

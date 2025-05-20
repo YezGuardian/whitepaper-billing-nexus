@@ -554,7 +554,7 @@ export const getInvoices = async (): Promise<Invoice[]> => {
 
 export const saveInvoice = async (invoice: Invoice): Promise<Invoice> => {
   try {
-    console.log("saveInvoice function called with:", JSON.stringify(invoice));
+    console.log("saveInvoice function called with:", JSON.stringify(invoice, null, 2));
     
     // Determine if this is a new invoice or an update
     const isNewInvoice = !invoice.id;
@@ -562,13 +562,22 @@ export const saveInvoice = async (invoice: Invoice): Promise<Invoice> => {
     
     console.log("Invoice ID:", invoiceId, "Is new invoice:", isNewInvoice);
     
+    // Convert dates to ISO string format for database storage
+    const issueDate = invoice.issueDate instanceof Date 
+      ? invoice.issueDate.toISOString().split('T')[0] 
+      : new Date(invoice.issueDate).toISOString().split('T')[0];
+      
+    const dueDate = invoice.dueDate instanceof Date 
+      ? invoice.dueDate.toISOString().split('T')[0] 
+      : new Date(invoice.dueDate).toISOString().split('T')[0];
+    
     // Prepare the invoice data for database
     const invoiceData = {
       id: invoiceId,
       invoice_number: invoice.invoiceNumber,
       client_id: invoice.client.id,
-      issue_date: new Date(invoice.issueDate).toISOString().split('T')[0],
-      due_date: new Date(invoice.dueDate).toISOString().split('T')[0],
+      issue_date: issueDate,
+      due_date: dueDate,
       total_amount: invoice.total,
       notes: invoice.notes || null,
       terms: invoice.terms || null,
@@ -594,6 +603,17 @@ export const saveInvoice = async (invoice: Invoice): Promise<Invoice> => {
       
       console.log("Insert response:", data);
     } else {
+      // Delete existing items for this invoice to recreate them
+      const { error: deleteError } = await supabase
+        .from('invoice_items')
+        .delete()
+        .eq('invoice_id', invoiceId);
+      
+      if (deleteError) {
+        console.error('Error deleting invoice items:', deleteError);
+        throw deleteError;
+      }
+
       const { data, error: updateError } = await supabase
         .from('invoices')
         .update(invoiceData)
@@ -606,17 +626,6 @@ export const saveInvoice = async (invoice: Invoice): Promise<Invoice> => {
       }
       
       console.log("Update response:", data);
-      
-      // Delete existing items for this invoice to recreate them
-      const { error: deleteError } = await supabase
-        .from('invoice_items')
-        .delete()
-        .eq('invoice_id', invoiceId);
-      
-      if (deleteError) {
-        console.error('Error deleting invoice items:', deleteError);
-        throw deleteError;
-      }
     }
     
     console.log("Saving invoice items...");
@@ -634,7 +643,7 @@ export const saveInvoice = async (invoice: Invoice): Promise<Invoice> => {
         description: item.description,
         quantity: item.quantity,
         unit_price: item.unitPrice,
-        tax_rate: item.taxRate,
+        tax_rate: item.taxRate || 0,
         amount: total
       };
       

@@ -79,7 +79,13 @@ const InvoiceForm: React.FC<InvoiceFormProps> = ({
           clientId: invoice.client.id,
           issueDate: invoice.issueDate,
           dueDate: invoice.dueDate,
-          items: invoice.items,
+          items: invoice.items.map(item => ({
+            id: item.id,
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            taxRate: item.taxRate || 0,
+          })),
           notes: invoice.notes || "",
           terms: invoice.terms || "",
           status: invoice.status,
@@ -133,60 +139,64 @@ const InvoiceForm: React.FC<InvoiceFormProps> = ({
   };
 
   const onSubmit = (data: z.infer<typeof invoiceFormSchema>) => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
 
-    // Find the selected client
-    const selectedClient = clients.find(client => client.id === data.clientId);
-    
-    if (!selectedClient) {
-      console.error("Client not found");
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Prepare the items with calculated values
-    const preparedItems = data.items.map(item => {
-      const itemTotal = item.quantity * item.unitPrice;
-      const taxAmount = (itemTotal * item.taxRate) / 100;
+    try {
+      // Find the selected client
+      const selectedClient = clients.find(client => client.id === data.clientId);
       
-      return {
-        id: item.id || uuidv4(),
-        description: item.description,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        taxRate: item.taxRate,
-        taxAmount,
-        total: itemTotal + taxAmount,
+      if (!selectedClient) {
+        console.error("Client not found");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Prepare the items with calculated values
+      const preparedItems = data.items.map(item => {
+        const itemTotal = item.quantity * item.unitPrice;
+        const taxAmount = (itemTotal * item.taxRate) / 100;
+        
+        return {
+          id: item.id || uuidv4(),
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          taxRate: item.taxRate,
+          taxAmount,
+          total: itemTotal + taxAmount,
+        };
+      });
+
+      const subtotal = calculateSubtotal();
+      const taxTotal = calculateTaxTotal();
+      const total = calculateTotal();
+
+      // Create the invoice object
+      const invoiceData: Invoice = {
+        id: invoice?.id,
+        invoiceNumber: data.invoiceNumber,
+        client: selectedClient,
+        issueDate: data.issueDate,
+        dueDate: data.dueDate,
+        items: preparedItems,
+        notes: data.notes,
+        terms: data.terms,
+        subtotal,
+        taxTotal,
+        total,
+        status: data.status,
+        recurrence: data.recurrence,
+        nextGenerationDate: data.recurrence !== 'none' ? getNextGenerationDate(data.issueDate, data.recurrence) : undefined,
       };
-    });
 
-    const subtotal = calculateSubtotal();
-    const taxTotal = calculateTaxTotal();
-    const total = calculateTotal();
-
-    // Create the invoice object
-    const invoiceData: Invoice = {
-      id: invoice?.id || uuidv4(),
-      invoiceNumber: data.invoiceNumber,
-      client: selectedClient,
-      issueDate: data.issueDate,
-      dueDate: data.dueDate,
-      items: preparedItems,
-      notes: data.notes,
-      terms: data.terms,
-      subtotal,
-      taxTotal,
-      total,
-      status: data.status,
-      recurrence: data.recurrence,
-      nextGenerationDate: data.recurrence !== 'none' ? getNextGenerationDate(data.issueDate, data.recurrence) : undefined,
-    };
-
-    // Simulate API call
-    setTimeout(() => {
+      // Save the invoice
       onSave(invoiceData);
+    } catch (error) {
+      console.error("Error in form submission:", error);
+    } finally {
       setIsSubmitting(false);
-    }, 500);
+    }
   };
 
   const getNextGenerationDate = (date: Date, recurrence: string) => {
