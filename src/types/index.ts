@@ -56,6 +56,8 @@ export interface User {
   name: string;
   email: string;
   role: 'admin' | 'staff';
+  username?: string;
+  full_name?: string;
 }
 
 export interface CompanySettings {
