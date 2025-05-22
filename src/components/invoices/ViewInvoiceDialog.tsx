@@ -10,13 +10,13 @@ import {
 import { Download, FileText } from 'lucide-react';
 import InvoiceDocument from '@/components/InvoiceDocument';
 import { Invoice } from '@/types';
-import { UseReactToPdfReturn } from '@/hooks/use-pdf';
+import { useReactToPdf } from '@/hooks/use-pdf';
 
 interface ViewInvoiceDialogProps {
   isOpen: boolean;
   onClose: () => void;
   invoice: Invoice | null;
-  pdfTools: UseReactToPdfReturn;
+  pdfTools: ReturnType<typeof useReactToPdf>;
   onDownload: () => Promise<void>;
 }
 
