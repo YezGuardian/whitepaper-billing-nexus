@@ -1,4 +1,3 @@
-
 import React from 'react';
 interface LogoProps {
   className?: string;
@@ -14,7 +13,7 @@ const Logo: React.FC<LogoProps> = ({
       </div>;
   }
   return <div className={`flex items-center ${className}`}>
-      <img src="/lovable-uploads/668f9483-bfa9-49aa-9ceb-5b4f071a86c7.png" alt="White Paper Systems Logo" className="h-8 sm:h-10 w-auto" />
+      <img alt="White Paper Systems Logo" className="h-8 sm:h-10 w-auto" src="/lovable-uploads/32a9720a-9116-4c99-8b74-9c1cf83cfcea.png" />
     </div>;
 };
 export default Logo;
