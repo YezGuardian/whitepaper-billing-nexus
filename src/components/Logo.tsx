@@ -9,7 +9,7 @@ const Logo: React.FC<LogoProps> = ({
 }) => {
   if (variant === 'icon-only') {
     return <div className={`flex items-center ${className}`}>
-        <img alt="White Paper Systems Logo" className="h-8 w-auto" src="/lovable-uploads/668f9483-bfa9-49aa-9ceb-5b4f071a86c7.png" />
+        <img alt="White Paper Systems Logo" className="h-8 w-auto" src="/lovable-uploads/08462601-b235-4b7b-b61f-5e63c695ba5c.png" />
       </div>;
   }
   return <div className={`flex items-center ${className}`}>
