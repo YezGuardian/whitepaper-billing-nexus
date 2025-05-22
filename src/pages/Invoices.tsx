@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -6,7 +5,7 @@ import { useReactToPdf } from '@/hooks/use-pdf';
 import MainLayout from '@/layouts/MainLayout';
 import { DataTable } from '@/components/DataTable';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Invoice } from '@/types';
 import StatusBadge from '@/components/StatusBadge';
 import { Edit, Eye, FileText, Download, Plus, Trash2, Loader } from 'lucide-react';
@@ -29,6 +28,7 @@ const InvoicesPage = () => {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   // PDF generation setup - ensure targetRef is passed to InvoiceDocument
@@ -67,6 +67,7 @@ const InvoicesPage = () => {
   // Handle form submission
   const handleSaveInvoice = async (invoice: Invoice) => {
     try {
+      setIsSaving(true);
       console.log("Attempting to save invoice:", JSON.stringify(invoice, null, 2));
       
       // Ensure all required fields are present
@@ -109,6 +110,8 @@ const InvoicesPage = () => {
         description: `Failed to save invoice: ${error.message || 'Unknown error'}`,
         variant: 'destructive',
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -290,6 +293,9 @@ const InvoicesPage = () => {
             <DialogTitle>
               {selectedInvoice ? 'Edit Invoice' : 'Create Invoice'}
             </DialogTitle>
+            <DialogDescription>
+              Fill in the details below to {selectedInvoice ? 'update' : 'create'} an invoice.
+            </DialogDescription>
           </DialogHeader>
           {companySettings && (
             <InvoiceForm
@@ -314,6 +320,9 @@ const InvoicesPage = () => {
               <FileText className="mr-2 h-5 w-5" />
               {selectedInvoice?.invoiceNumber}
             </DialogTitle>
+            <DialogDescription>
+              View your invoice details and download as PDF.
+            </DialogDescription>
             <Button
               variant="outline"
               size="sm"
@@ -336,9 +345,12 @@ const InvoicesPage = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Invoice</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. This will permanently delete the invoice.
+            </DialogDescription>
           </DialogHeader>
           <p>
-            Are you sure you want to delete invoice {selectedInvoice?.invoiceNumber}? This action cannot be undone.
+            Are you sure you want to delete invoice {selectedInvoice?.invoiceNumber}?
           </p>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>

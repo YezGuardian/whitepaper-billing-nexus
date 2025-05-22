@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Client, CompanySettings, Invoice, InvoiceItem, Quote } from "@/types";
 import { v4 as uuidv4 } from "uuid";
@@ -541,7 +542,8 @@ export const getInvoices = async (): Promise<Invoice[]> => {
         total: Number(invoice.total_amount),
         status: invoice.status as any,
         recurrence: (invoice.recurrence as "none" | "weekly" | "monthly" | "quarterly" | "yearly") || "none",
-        nextGenerationDate: invoiceData.next_generation_date ? new Date(invoiceData.next_generation_date) : undefined
+        // Remove the nextGenerationDate since it's causing issues
+        nextGenerationDate: undefined
       });
     }
     
@@ -572,6 +574,7 @@ export const saveInvoice = async (invoice: Invoice): Promise<Invoice> => {
       : new Date(invoice.dueDate).toISOString().split('T')[0];
     
     // Prepare the invoice data for database
+    // IMPORTANT: Remove the next_generation_date field that's causing errors
     const invoiceData = {
       id: invoiceId,
       invoice_number: invoice.invoiceNumber,
@@ -583,8 +586,7 @@ export const saveInvoice = async (invoice: Invoice): Promise<Invoice> => {
       terms: invoice.terms || null,
       status: invoice.status,
       recurrence: invoice.recurrence || 'none',
-      next_generation_date: invoice.nextGenerationDate ? 
-        new Date(invoice.nextGenerationDate).toISOString().split('T')[0] : null
+      // Remove the next_generation_date field that's causing the error
     };
     
     console.log("Prepared invoice data:", invoiceData);

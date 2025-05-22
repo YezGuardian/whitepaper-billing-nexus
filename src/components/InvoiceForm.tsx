@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -172,7 +171,7 @@ const InvoiceForm: React.FC<InvoiceFormProps> = ({
       const taxTotal = calculateTaxTotal();
       const total = calculateTotal();
 
-      // Create the invoice object
+      // Create the invoice object without nextGenerationDate
       const invoiceData: Invoice = {
         id: invoice?.id,
         invoiceNumber: data.invoiceNumber,
@@ -187,8 +186,10 @@ const InvoiceForm: React.FC<InvoiceFormProps> = ({
         total,
         status: data.status,
         recurrence: data.recurrence,
-        nextGenerationDate: data.recurrence !== 'none' ? getNextGenerationDate(data.issueDate, data.recurrence) : undefined,
+        // Remove nextGenerationDate
       };
+
+      console.log("Submitting invoice data:", invoiceData);
 
       // Save the invoice
       onSave(invoiceData);
@@ -197,29 +198,6 @@ const InvoiceForm: React.FC<InvoiceFormProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const getNextGenerationDate = (date: Date, recurrence: string) => {
-    const nextDate = new Date(date);
-    
-    switch (recurrence) {
-      case 'weekly':
-        nextDate.setDate(nextDate.getDate() + 7);
-        break;
-      case 'monthly':
-        nextDate.setMonth(nextDate.getMonth() + 1);
-        break;
-      case 'quarterly':
-        nextDate.setMonth(nextDate.getMonth() + 3);
-        break;
-      case 'yearly':
-        nextDate.setFullYear(nextDate.getFullYear() + 1);
-        break;
-      default:
-        return undefined;
-    }
-    
-    return nextDate;
   };
 
   return (
