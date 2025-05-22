@@ -85,9 +85,9 @@ const Auth = () => {
       });
       toast({
         title: "Registration successful",
-        description: "Your account has been created successfully",
+        description: "Your account has been created successfully. Please check your email for verification.",
       });
-      setActiveTab("login");
+      // Don't switch to login tab automatically to allow the user to see the success message
     } catch (error: any) {
       console.error("Registration error:", error);
       toast({

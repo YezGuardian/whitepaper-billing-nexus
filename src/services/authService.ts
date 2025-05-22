@@ -12,6 +12,8 @@ export const handleAuthError = (error: AuthError): never => {
     message = "Invalid email or password. Please check your credentials.";
   } else if (error.message.includes("rate limited")) {
     message = "Too many attempts. Please try again later.";
+  } else if (error.message.includes("Email not confirmed")) {
+    message = "Please verify your email address before logging in.";
   }
   
   const enhancedError = new Error(message);
@@ -19,6 +21,7 @@ export const handleAuthError = (error: AuthError): never => {
 };
 
 export const signInWithEmail = async (email: string, password: string) => {
+  console.log('Signing in with:', email);
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -33,6 +36,7 @@ export const signInWithEmail = async (email: string, password: string) => {
 };
 
 export const signUpWithEmail = async (email: string, password: string, userData: Partial<User>) => {
+  console.log('Signing up with:', email, 'and user data:', userData);
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -46,6 +50,7 @@ export const signUpWithEmail = async (email: string, password: string, userData:
     throw handleAuthError(error);
   }
   
+  console.log('Signup successful:', data);
   return data;
 };
 
