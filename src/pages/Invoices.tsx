@@ -1,23 +1,24 @@
+
 import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useReactToPdf } from '@/hooks/use-pdf';
 import MainLayout from '@/layouts/MainLayout';
-import { DataTable } from '@/components/DataTable';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Invoice } from '@/types';
-import StatusBadge from '@/components/StatusBadge';
-import { Edit, Eye, FileText, Download, Plus, Trash2, Loader } from 'lucide-react';
-import InvoiceForm from '@/components/InvoiceForm';
-import InvoiceDocument from '@/components/InvoiceDocument';
+import { Loader, Plus } from 'lucide-react';
 import { 
   getInvoices, 
   getClients, 
   saveInvoice, 
   deleteInvoice, 
   getCompanySettings 
-} from '@/services/supabaseService';
+} from '@/services/invoiceService';
+
+// Import the new components
+import InvoiceList from '@/components/invoices/InvoiceList';
+import DeleteInvoiceDialog from '@/components/invoices/DeleteInvoiceDialog';
+import ViewInvoiceDialog from '@/components/invoices/ViewInvoiceDialog';
+import InvoiceFormDialog from '@/components/invoices/InvoiceFormDialog';
 
 const InvoicesPage = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -31,8 +32,8 @@ const InvoicesPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
-  // PDF generation setup - ensure targetRef is passed to InvoiceDocument
-  const { toPDF, targetRef, loading } = useReactToPdf({
+  // PDF generation setup
+  const pdfTools = useReactToPdf({
     filename: selectedInvoice ? `invoice-${selectedInvoice.invoiceNumber}.pdf` : 'invoice.pdf',
   });
 
@@ -69,24 +70,6 @@ const InvoicesPage = () => {
     try {
       setIsSaving(true);
       console.log("Attempting to save invoice:", JSON.stringify(invoice, null, 2));
-      
-      // Ensure all required fields are present
-      if (!invoice.client || !invoice.client.id) {
-        throw new Error("Invalid client data");
-      }
-      
-      if (!invoice.items || invoice.items.length === 0) {
-        throw new Error("Invoice must have at least one item");
-      }
-      
-      // Verify dates are valid
-      if (!(invoice.issueDate instanceof Date) || isNaN(invoice.issueDate.getTime())) {
-        throw new Error("Invalid issue date");
-      }
-      
-      if (!(invoice.dueDate instanceof Date) || isNaN(invoice.dueDate.getTime())) {
-        throw new Error("Invalid due date");
-      }
       
       // Save the invoice to the database
       const savedInvoice = await saveInvoice(invoice);
@@ -142,22 +125,10 @@ const InvoicesPage = () => {
     }
   };
 
-  // Open invoice form for editing
-  const handleEdit = (invoice: Invoice) => {
-    setSelectedInvoice(invoice);
-    setIsFormOpen(true);
-  };
-
-  // Open invoice viewer
-  const handleView = (invoice: Invoice) => {
-    setSelectedInvoice(invoice);
-    setIsViewOpen(true);
-  };
-
-  // Handle download PDF using our updated approach
+  // Handle download PDF
   const handleDownload = async () => {
     try {
-      const url = await toPDF();
+      const url = await pdfTools.toPDF();
       if (url) {
         toast({
           title: 'PDF Generated',
@@ -175,95 +146,6 @@ const InvoicesPage = () => {
     }
   };
 
-  // Create a new invoice
-  const handleCreate = () => {
-    setSelectedInvoice(null);
-    setIsFormOpen(true);
-  };
-
-  // Table columns configuration
-  const columns = [
-    {
-      accessorKey: 'invoiceNumber',
-      header: 'Invoice #',
-    },
-    {
-      accessorKey: 'client.name',
-      header: 'Client',
-    },
-    {
-      accessorKey: 'issueDate',
-      header: 'Issue Date',
-      cell: ({ row }: { row: any }) => {
-        const date = new Date(row.original.issueDate);
-        return isNaN(date.getTime()) ? '-' : format(date, 'dd MMM yyyy');
-      },
-    },
-    {
-      accessorKey: 'dueDate',
-      header: 'Due Date',
-      cell: ({ row }: { row: any }) => {
-        const date = new Date(row.original.dueDate);
-        return isNaN(date.getTime()) ? '-' : format(date, 'dd MMM yyyy');
-      },
-    },
-    {
-      accessorKey: 'total',
-      header: 'Total',
-      cell: ({ row }: { row: any }) => {
-        return `R ${Number(row.original.total).toFixed(2)}`;
-      },
-    },
-    {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }: { row: any }) => {
-        return <StatusBadge status={row.original.status} />;
-      },
-    },
-    {
-      accessorKey: 'recurrence',
-      header: 'Recurrence',
-      cell: ({ row }: { row: any }) => {
-        return row.original.recurrence === 'none' ? '-' : row.original.recurrence;
-      },
-    },
-    {
-      id: 'actions',
-      cell: ({ row }: { row: any }) => {
-        return (
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleView(row.original)}
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleEdit(row.original)}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-red-500 hover:text-red-700 hover:bg-red-50"
-              onClick={() => {
-                setSelectedInvoice(row.original);
-                setIsDeleteDialogOpen(true);
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        );
-      },
-    },
-  ];
-
   if (isLoading) {
     return (
       <MainLayout>
@@ -278,90 +160,57 @@ const InvoicesPage = () => {
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
-        <Button onClick={handleCreate}>
+        <Button onClick={() => {
+          setSelectedInvoice(null);
+          setIsFormOpen(true);
+        }}>
           <Plus className="mr-2 h-4 w-4" />
           New Invoice
         </Button>
       </div>
 
-      <DataTable columns={columns} data={invoices} searchField="invoiceNumber" />
+      <InvoiceList 
+        invoices={invoices} 
+        onView={(invoice) => {
+          setSelectedInvoice(invoice);
+          setIsViewOpen(true);
+        }} 
+        onEdit={(invoice) => {
+          setSelectedInvoice(invoice);
+          setIsFormOpen(true);
+        }} 
+        onDelete={(invoice) => {
+          setSelectedInvoice(invoice);
+          setIsDeleteDialogOpen(true);
+        }} 
+      />
 
       {/* Invoice Form Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedInvoice ? 'Edit Invoice' : 'Create Invoice'}
-            </DialogTitle>
-            <DialogDescription>
-              Fill in the details below to {selectedInvoice ? 'update' : 'create'} an invoice.
-            </DialogDescription>
-          </DialogHeader>
-          {companySettings && (
-            <InvoiceForm
-              invoice={selectedInvoice || undefined}
-              clients={clients}
-              onSave={handleSaveInvoice}
-              onCancel={() => setIsFormOpen(false)}
-              companySettings={{
-                invoicePrefix: companySettings.invoicePrefix,
-                invoiceTerms: companySettings.invoiceTerms,
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <InvoiceFormDialog 
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        invoice={selectedInvoice}
+        clients={clients}
+        companySettings={companySettings}
+        onSave={handleSaveInvoice}
+      />
 
       {/* Invoice View Dialog */}
-      <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader className="flex flex-row items-center justify-between">
-            <DialogTitle className="flex items-center">
-              <FileText className="mr-2 h-5 w-5" />
-              {selectedInvoice?.invoiceNumber}
-            </DialogTitle>
-            <DialogDescription>
-              View your invoice details and download as PDF.
-            </DialogDescription>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownload}
-              className="flex items-center"
-              disabled={loading}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              {loading ? 'Generating...' : 'Download PDF'}
-            </Button>
-          </DialogHeader>
-          <div ref={targetRef} className="bg-white">
-            {selectedInvoice && <InvoiceDocument invoice={selectedInvoice} />}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ViewInvoiceDialog 
+        isOpen={isViewOpen}
+        onClose={() => setIsViewOpen(false)}
+        invoice={selectedInvoice}
+        pdfTools={pdfTools}
+        onDownload={handleDownload}
+      />
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Invoice</DialogTitle>
-            <DialogDescription>
-              This action cannot be undone. This will permanently delete the invoice.
-            </DialogDescription>
-          </DialogHeader>
-          <p>
-            Are you sure you want to delete invoice {selectedInvoice?.invoiceNumber}?
-          </p>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteInvoice}>
-              Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DeleteInvoiceDialog 
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        invoice={selectedInvoice}
+        onConfirm={handleDeleteInvoice}
+      />
     </MainLayout>
   );
 };
