@@ -1,14 +1,17 @@
 
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
-import { LayoutDashboard, FileText, Quote, Users, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, FileText, Quote, Users, Settings, LogOut, User } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { signOut } from '@/services/authService';
 import Logo from './Logo';
 import { cn } from "@/lib/utils";
+import { useAuth } from '@/contexts/AuthContext';
 
 const AppSidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   
   const menuItems = [{
     title: "Dashboard",
@@ -39,6 +42,7 @@ const AppSidebar = () => {
         title: "Logout successful",
         description: "You have been logged out successfully"
       });
+      navigate('/auth');
     } catch (error) {
       console.error('Logout error:', error);
       toast({
@@ -58,6 +62,19 @@ const AppSidebar = () => {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
+          {user && (
+            <div className="px-3 py-2 mb-4">
+              <div className="flex items-center gap-3 px-3 py-2 rounded-md bg-sidebar-accent bg-opacity-20">
+                <User className="h-5 w-5 text-sidebar-accent-foreground" />
+                <div className="text-sm">
+                  <div className="font-medium text-sidebar-accent-foreground">{user.user_metadata.full_name || user.email}</div>
+                  <div className="text-xs text-sidebar-foreground opacity-70">
+                    {user.user_metadata.username || user.email}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map(item => <SidebarMenuItem key={item.path}>

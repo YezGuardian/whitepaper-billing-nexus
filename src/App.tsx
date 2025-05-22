@@ -10,7 +10,9 @@ import InvoicesPage from "./pages/Invoices";
 import QuotesPage from "./pages/Quotes";
 import ClientsPage from "./pages/Clients";
 import SettingsPage from "./pages/Settings";
+import AuthPage from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -22,11 +24,12 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/invoices" element={<InvoicesPage />} />
-            <Route path="/quotes" element={<QuotesPage />} />
-            <Route path="/clients" element={<ClientsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/invoices" element={<ProtectedRoute><InvoicesPage /></ProtectedRoute>} />
+            <Route path="/quotes" element={<ProtectedRoute><QuotesPage /></ProtectedRoute>} />
+            <Route path="/clients" element={<ProtectedRoute><ClientsPage /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

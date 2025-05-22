@@ -1,6 +1,22 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types';
+import { AuthError } from '@supabase/supabase-js';
+
+export const handleAuthError = (error: AuthError): never => {
+  let message = "Authentication failed. Please try again.";
+  
+  if (error.message.includes("email address is already registered")) {
+    message = "This email is already registered. Please log in instead.";
+  } else if (error.message.includes("Invalid login credentials")) {
+    message = "Invalid email or password. Please check your credentials.";
+  } else if (error.message.includes("rate limited")) {
+    message = "Too many attempts. Please try again later.";
+  }
+  
+  const enhancedError = new Error(message);
+  throw enhancedError;
+};
 
 export const signInWithEmail = async (email: string, password: string) => {
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -10,7 +26,7 @@ export const signInWithEmail = async (email: string, password: string) => {
   
   if (error) {
     console.error('Error signing in:', error);
-    throw error;
+    throw handleAuthError(error);
   }
   
   return data;
@@ -27,7 +43,7 @@ export const signUpWithEmail = async (email: string, password: string, userData:
   
   if (error) {
     console.error('Error signing up:', error);
-    throw error;
+    throw handleAuthError(error);
   }
   
   return data;
@@ -51,6 +67,21 @@ export const getCurrentUser = async () => {
   }
   
   return data.user;
+};
+
+export const getUserProfile = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+    
+  if (error) {
+    console.error('Error fetching user profile:', error);
+    return null;
+  }
+  
+  return data;
 };
 
 export const onAuthStateChange = (callback: (user: any) => void) => {
