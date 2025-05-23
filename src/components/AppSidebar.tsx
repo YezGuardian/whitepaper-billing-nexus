@@ -1,4 +1,3 @@
-
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
 import { LayoutDashboard, FileText, Quote, Users, Settings, LogOut, User } from "lucide-react";
@@ -13,6 +12,14 @@ const AppSidebar = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
+  // Function to get display name
+  const getDisplayName = () => {
+    if (user?.email === 'accounts@whitepaperconcepts.co.za') {
+      return 'Accounts Manager';
+    }
+    return user?.user_metadata?.full_name || user?.email;
+  };
+
   const menuItems = [{
     title: "Dashboard",
     path: "/",
@@ -67,9 +74,9 @@ const AppSidebar = () => {
               <div className="flex items-center gap-3 px-3 py-2 rounded-md bg-sidebar-accent bg-opacity-20">
                 <User className="h-5 w-5 text-sidebar-accent-foreground" />
                 <div className="text-sm">
-                  <div className="font-medium text-sidebar-accent-foreground">{user.user_metadata.full_name || user.email}</div>
+                  <div className="font-medium text-sidebar-accent-foreground">{getDisplayName()}</div>
                   <div className="text-xs text-sidebar-foreground opacity-70">
-                    {user.user_metadata.username || user.email}
+                    {user.email}
                   </div>
                 </div>
               </div>

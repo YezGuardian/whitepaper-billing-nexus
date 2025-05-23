@@ -1,4 +1,4 @@
-
+import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { BarChart, Activity, Users, FileText, FileClock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,10 +18,45 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import StatCard from "@/components/StatCard";
-import { clients, invoices, quotes } from "@/data/mockData";
+import { getInvoices, getClients, getQuotes } from '@/services/supabaseService';
+import { Invoice, Client, Quote } from '@/types';
+import { useToast } from '@/hooks/use-toast';
 
 const DashboardPage = () => {
-  // Calculate statistics
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [invoicesData, clientsData, quotesData] = await Promise.all([
+          getInvoices(),
+          getClients(),
+          getQuotes()
+        ]);
+        
+        setInvoices(invoicesData);
+        setClients(clientsData);
+        setQuotes(quotesData);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load dashboard data',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [toast]);
+
+  // Calculate statistics from real data
   const totalRevenue = invoices
     .filter(invoice => invoice.status === 'paid')
     .reduce((acc, invoice) => acc + invoice.total, 0);
@@ -31,26 +66,37 @@ const DashboardPage = () => {
     .reduce((acc, invoice) => acc + invoice.total, 0);
   
   const overdueInvoices = invoices.filter(invoice => invoice.status === 'overdue').length;
-  
   const pendingQuotes = quotes.filter(quote => quote.status === 'sent').length;
 
-  // Get current month and create mock monthly data
+  // Get current month and prepare monthly data
   const currentMonth = new Date().getMonth();
   const months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
   ];
 
-  // Mock data for monthly revenue chart (last 6 months)
+  // Calculate real monthly revenue for the last 6 months
   const revenueData = Array(6).fill(0).map((_, index) => {
     const monthIndex = (currentMonth - 5 + index + 12) % 12;
+    const monthStart = new Date(new Date().getFullYear(), monthIndex, 1);
+    const monthEnd = new Date(new Date().getFullYear(), monthIndex + 1, 0);
+    
+    const monthlyRevenue = invoices
+      .filter(invoice => {
+        const invoiceDate = new Date(invoice.issueDate);
+        return invoice.status === 'paid' &&
+               invoiceDate >= monthStart &&
+               invoiceDate <= monthEnd;
+      })
+      .reduce((acc, invoice) => acc + invoice.total, 0);
+
     return {
       name: months[monthIndex],
-      revenue: Math.floor(Math.random() * 50000) + 10000
+      revenue: monthlyRevenue
     };
   });
 
-  // Count invoices by status for chart data
+  // Count invoices by status
   const invoiceStatusCount = {
     draft: invoices.filter(i => i.status === 'draft').length,
     sent: invoices.filter(i => i.status === 'sent').length,
@@ -72,6 +118,16 @@ const DashboardPage = () => {
       new Date(b.nextGenerationDate as Date).getTime()
     )
     .slice(0, 5);
+
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex justify-center items-center h-[calc(100vh-200px)]">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
